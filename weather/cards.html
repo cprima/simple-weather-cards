@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Display</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+
+body {
+  font-family: 'Open Sans', sans-serif;
+  background-color: #FFCC00;
+  margin: 0; /* Remove default margin */
+}
+
+.main-content {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh; /* Ensure full viewport height for centering */
+}
+
+.container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1400px;
+  margin: auto;
+}
+
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column; /* Stack cards vertically on smaller screens */
+    align-items: center; /* Center-align the cards for a neat appearance */
+  }
+}
+
+.card {
+  width: 256px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid #D40511;
+  border-radius: 4px;
+  overflow: hidden;
+  background-color: #FFF; /* Add a light background for better readability */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Add subtle shadow for depth */
+}
+
+.card-header {
+  color: #FFCC00;
+  text-align: center;
+  font-weight: 600;
+  font-size: 1.5rem;
+  border-bottom: 1px solid #D40511;
+  background-color: #D40511;
+  padding: 10px 10px; /* Increase padding for better spacing */
+}
+
+.card-main {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 15px 10px; /* Adjust padding for overall consistency */
+  background-color: #FFCC00;
+  border-bottom: 1px solid #D40511;
+}
+
+.temperature-container {
+  display: flex;
+  flex-direction: column; /* Stack icon and temperature vertically */
+  align-items: center;
+  margin: 10px 0; /* Add more space around the temperature for emphasis */
+}
+
+.material-icons {
+  font-size: 36px;
+  color: #D40511;
+  margin-bottom: 5px;
+}
+
+.temperature-text, .weather-description {
+  color: #D40511;
+  font-size: 1.2rem; /* Slightly increase font size for readability */
+  text-align: center;
+  margin: 5px 0; /* Ensure consistent spacing around text elements */
+}
+
+/* Header and Footer Styles */
+header, footer {
+    width: 100%;
+    padding: 10px 0;
+    text-align: center;
+}
+
+header {
+    /* Empty as per request, add any desired styles here */
+}
+
+footer {
+    font-size: 0.75rem;
+    color: #cccccc; /* Unnoticeable color as requested */
+}
+
+    </style>
+</head>
+<body>
+
+<header></header>
+<div class="main-content">
+<div id="root" class="container"></div>
+</div>
+<footer id="cache-info"></footer>
+
+<script>
+
+// Mapping of city IDs to custom display names
+const cityIdToNameMapping = {
+    "6697380": "Cyberjaya",
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+    const app = document.getElementById('root');
+    app.className = 'container';
+    const footer = document.getElementById('cache-info');
+    const queryString = window.location.search;
+    const urlParams = new URLSearchParams(queryString);
+    //let cities = '2946447,2806654,1273294,1264527';
+    let cities = '2946447,3067696,1264527,6697380';
+
+    if (urlParams.has('cities')) {
+        cities = urlParams.get('cities');
+    }
+
+    // Adjust this URL to point to your PHP proxy script
+    const apiUrl = `/weather/openweathermap_proxy.php?ids=${cities}`;
+
+fetch(apiUrl)
+    .then(response => {
+        // Access custom headers
+        const cacheState = response.headers.get('X-Cache');
+        const cacheAge = response.headers.get('X-Cache-Age');
+        console.log(`Cache State: ${cacheState}, Cache Age: ${cacheAge} seconds`);
+        footer.textContent = `Cache Age: ${cacheAge} seconds`;
+
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.error) {
+            console.error('Error fetching weather data:', data.details);
+            // Handle error in UI, e.g., show an error message
+        } else {
+            data.list.forEach(weatherData => app.appendChild(createWeatherCard(weatherData)));
+        }
+    })
+    .catch(error => console.error("Error fetching weather data:", error));
+
+});
+
+function getCityDisplayName(cityId, defaultName) {
+    // Check if the cityId exists in the mapping, return the custom name if it does
+    // Otherwise, return the default name from OpenWeatherMap
+    return cityIdToNameMapping[cityId] || defaultName;
+}
+
+function createWeatherCard(weatherData) {
+    const cityId = weatherData.id.toString(); // Ensure cityId is a string to match keys in the mapping
+    const defaultCityName = weatherData.name;
+    const displayName = getCityDisplayName(cityId, defaultCityName);
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.appendChild(createCardHeader(displayName));
+    card.appendChild(createCardMain(weatherData));
+    return card;
+}
+
+function createCardHeader(cityName) {
+    const header = document.createElement('div');
+    header.className = 'card-header';
+    header.textContent = cityName;
+    return header;
+}
+
+function createCardMain(weatherData) {
+    const main = document.createElement('div');
+    main.className = 'card-main';
+    main.style.display = 'flex';
+    main.style.flexDirection = 'column';
+    main.style.alignItems = 'center';
+    main.appendChild(createTemperatureElement(weatherData.main.temp));
+    main.appendChild(createWeatherIconElement(weatherData.weather[0].icon, weatherData.weather[0].description));
+    main.appendChild(createDescriptionElement(weatherData.weather[0].description));
+    return main;
+}
+
+function createTemperatureElement(temp) {
+    const temperatureContainer = document.createElement('div');
+    temperatureContainer.className = 'temperature-container';
+    const iconElem = document.createElement('i');
+    iconElem.className = 'material-icons';
+    iconElem.textContent = 'thermostat';
+    const tempText = document.createElement('span');
+    tempText.className = 'temperature-text';
+    tempText.textContent = `${Math.round(temp * 10) / 10}°C`;
+    temperatureContainer.appendChild(iconElem);
+    temperatureContainer.appendChild(tempText);
+    return temperatureContainer;
+}
+
+function createWeatherIconElement(iconCode, altText) {
+    const iconImg = document.createElement('img');
+    iconImg.src = `https://openweathermap.org/img/wn/${iconCode}.png`;
+    iconImg.alt = altText;
+    return iconImg;
+}
+
+function createDescriptionElement(descriptionText) {
+    const descriptionDiv = document.createElement('div');
+    descriptionDiv.className = 'weather-description';
+    descriptionDiv.textContent = descriptionText;
+    return descriptionDiv;
+}
+
+</script>
+
+</body>
+</html>
