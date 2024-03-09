@@ -7,17 +7,42 @@
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
 
+:root {
+    --primary-color: #cb4b16;
+    --secondary-color: #fdf6e3;
+    --header-height: 4px;
+    --footer-height: 60px;
+    --footer-link-color: #CCCCCC;
+}
+
 body {
   font-family: 'Open Sans', sans-serif;
-  background-color: #FFCC00;
-  margin: 0; /* Remove default margin */
+  background-color: var(--secondary-color);
+  margin: 0;
+  padding-top: var(--header-height); /* Space for the header */
+  padding-bottom: var(--footer-height); /* Space for the footer */
+  box-sizing: border-box;
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  background-color: var(--primary-color);
+  height: var(--header-height);
+  width: 100%;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2;
 }
 
 .main-content {
+  flex-grow: 1;
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh; /* Ensure full viewport height for centering */
 }
 
 .container {
@@ -25,94 +50,87 @@ body {
   flex-wrap: wrap;
   justify-content: center;
   gap: 20px;
-  padding: 20px;
-  max-width: 1400px;
-  margin: auto;
-}
-
-@media (max-width: 768px) {
-  .container {
-    flex-direction: column; /* Stack cards vertically on smaller screens */
-    align-items: center; /* Center-align the cards for a neat appearance */
-  }
+  position: relative;
+  z-index: 1;
 }
 
 .card {
   width: 256px;
   display: flex;
   flex-direction: column;
-  border: 1px solid #D40511;
+  border: 1px solid var(--primary-color);
   border-radius: 4px;
   overflow: hidden;
-  background-color: #FFF; /* Add a light background for better readability */
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Add subtle shadow for depth */
+  background-color: #FFF;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .card-header {
-  color: #FFCC00;
+  background-color: var(--primary-color); /* Background to primary for visibility */
+  color: var(--secondary-color); /* Text color to secondary for contrast */
   text-align: center;
   font-weight: 600;
   font-size: 1.5rem;
-  border-bottom: 1px solid #D40511;
-  background-color: #D40511;
-  padding: 10px 10px; /* Increase padding for better spacing */
+  padding: 10px;
 }
 
 .card-main {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  padding: 15px 10px; /* Adjust padding for overall consistency */
-  background-color: #FFCC00;
-  border-bottom: 1px solid #D40511;
+  padding: 15px 10px;
+  background-color: var(--secondary-color); /* Background to secondary color */
 }
 
-.temperature-container {
-  display: flex;
-  flex-direction: column; /* Stack icon and temperature vertically */
-  align-items: center;
-  margin: 10px 0; /* Add more space around the temperature for emphasis */
-}
-
-.material-icons {
-  font-size: 36px;
-  color: #D40511;
-  margin-bottom: 5px;
-}
-
-.temperature-text, .weather-description {
-  color: #D40511;
-  font-size: 1.2rem; /* Slightly increase font size for readability */
-  text-align: center;
-  margin: 5px 0; /* Ensure consistent spacing around text elements */
-}
-
-/* Header and Footer Styles */
-header, footer {
-    width: 100%;
-    padding: 10px 0;
-    text-align: center;
-}
-
-header {
-    /* Empty as per request, add any desired styles here */
+.material-icons, .temperature-text, .weather-description {
+  color: var(--primary-color); /* Text elements to primary for visibility */
 }
 
 footer {
-    font-size: 0.75rem;
-    color: #cccccc; /* Unnoticeable color as requested */
+  /*background-color: var(--primary-color);*/
+  color: #FFFFFF;
+  text-align: center;
+  font-size: 0.75rem;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--footer-height);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2;
 }
+
+.footer-content {
+  color: var(--footer-link-color);
+  display: flex;
+  justify-content: space-around;
+  width: 100%;
+  max-width: 1200px;
+}
+
+.footer-link {
+  color: var(--footer-link-color);
+  text-decoration: none;
+  margin: 0 10px;
+}
+
 
     </style>
 </head>
 <body>
 
-<header></header>
+<header>&nbsp;</header>
 <div class="main-content">
 <div id="root" class="container"></div>
 </div>
-<footer id="cache-info"></footer>
+<footer id="site-footer">
+  <div class="footer-content">
+    <span id="cache-age">Cache Age: Loading...</span>
+    <a href="https://github.com/cprima/simple-weather-cards" target="_blank" class="footer-link">GitHub Repository</a>
+    <a href="https://cpr.in-berlin.de/weather/" class="footer-link">0</a>
+    <a href="https://cpr.in-berlin.de/weather/?cities=2946447,3067696,1264527,6697380&primaryColor=D40511&secondaryColor=FFCC00" class="footer-link">A</a>
+    <a href="https://cpr.in-berlin.de/weather/?cities=2946447,2806654,1273294,1264527&primaryColor=D40511&secondaryColor=FFCC00" class="footer-link">B</a>
+  </div>
+</footer>
 
 <script>
 
@@ -128,7 +146,36 @@ document.addEventListener("DOMContentLoaded", () => {
     const queryString = window.location.search;
     const urlParams = new URLSearchParams(queryString);
     //let cities = '2946447,2806654,1273294,1264527';
-    let cities = '2946447,3067696,1264527,6697380';
+    //let cities = '2946447,3067696,1264527,6697380';
+    let cities = '2806654,616052';
+    // Default colors
+    // Extract color values from URL parameters, prepending '#' to denote color values
+    let primaryColor = `#${urlParams.get('primaryColor') || 'cb4b16'}`; // Default to Solarized orange if not specified
+    let secondaryColor = `#${urlParams.get('secondaryColor') || 'fdf6e3'}`; // Default to Solarized base3 if not specified
+    // Apply the colors to CSS variables
+    document.documentElement.style.setProperty('--primary-color', primaryColor);
+    document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+
+    // Function to mix the secondary color with black (80% secondary color, 20% black)
+    function mixWithBlack(color, percentage) {
+        const percent = percentage / 100;
+        // Parse the hex color
+        const [r, g, b] = color.match(/\w\w/g).map(x => parseInt(x, 16));
+        // Calculate the mixed color
+        const mixedColor = [
+            Math.round(r * (1 - percent)).toString(16).padStart(2, '0'),
+            Math.round(g * (1 - percent)).toString(16).padStart(2, '0'),
+            Math.round(b * (1 - percent)).toString(16).padStart(2, '0')
+        ].join('');
+        return `#${mixedColor}`;
+    }
+
+    // Compute the mixed footer link color
+    const footerLinkColor = mixWithBlack(secondaryColor.slice(1), 10);
+
+    // Apply the mixed color to footer links
+    document.documentElement.style.setProperty('--footer-link-color', footerLinkColor);
+
 
     if (urlParams.has('cities')) {
         cities = urlParams.get('cities');
@@ -141,9 +188,18 @@ fetch(apiUrl)
     .then(response => {
         // Access custom headers
         const cacheState = response.headers.get('X-Cache');
-        const cacheAge = response.headers.get('X-Cache-Age');
+        let cacheAge = response.headers.get('X-Cache-Age');
         console.log(`Cache State: ${cacheState}, Cache Age: ${cacheAge} seconds`);
-        footer.textContent = `Cache Age: ${cacheAge} seconds`;
+        // Handle an unset 'X-Cache-Age'
+        if (cacheAge === null) {
+            cacheAge = 'Unavailable'; // or any default/fallback message you prefer
+        } else {
+            cacheAge += ' seconds'; // Append 'seconds' only if the cache age is available
+        }
+
+        // Update the cache age display
+        const cacheAgeSpan = document.getElementById('cache-age');
+        cacheAgeSpan.textContent = `Cache Age: ${cacheAge}`;
 
         if (!response.ok) {
             throw new Error('Network response was not ok');
