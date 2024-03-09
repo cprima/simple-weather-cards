@@ -1,12 +1,33 @@
 <?php
-//error_reporting(E_ALL);
-//ini_set('display_errors', 1);
+/**
+ * OpenWeatherMap Proxy Script
+ * 
+ * This PHP script serves as a proxy to fetch weather data from OpenWeatherMap's API.
+ * It includes functionality to cache responses to minimize API calls and enhance performance.
+ * The script checks for cached data before making a new API call. If the cached data
+ * is still valid, it serves the cached response; otherwise, it fetches fresh data from
+ * OpenWeatherMap, caches it, and then serves it. The script uses environment variables
+ * for configuration settings like the API key to enhance security.
+ *
+ * Tested with PHP version 8.1
+ *
+ * @author     Christian Prior-Mamulyan
+ * @license    CC-BY
+ * @version    1.1
+ */
 
-$dotenv = parse_ini_file('.env');
-$apiKey = $dotenv["OPENWEATHERMAP_APIKEY"];
+$envFilePath = '.env';
+if (file_exists($envFilePath)) {
+    $dotenv = parse_ini_file($envFilePath);
+    $apiKey = $dotenv["OPENWEATHERMAP_APIKEY"];
+} else {
+    header('HTTP/1.1 500 Internal Server Error');
+    echo json_encode(['error' => '.env file not found.']);
+    exit;
+}
 
 // Define a default set of city IDs
-$defaultCityIds = '2946447,3067696,1273294,1264527,6697380';
+$defaultCityIds = '2806654,616052';
 
 // Check if city IDs are provided in the request, use the default if not
 $cityIds = isset($_GET['ids']) && !empty($_GET['ids']) ? $_GET['ids'] : $defaultCityIds;
