@@ -76,66 +76,61 @@
       text-decoration: none;
     }
 
+.weather-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 250px;
+    max-width: 300px;
+    background-color: var(--secondary-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
 
-    .weather-card {
-      display: flex;
-      flex-direction: column;
-      min-width: 250px;
-      max-width: 300px;
-      background-color: var(--secondary-color);
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
+.weather-card .header {
+    padding: 15px;
+    background-color: var(--primary-color);
+    color: var(--secondary-color);
+    text-align: center;
+}
 
-    .weather-card .header {
-      padding: 15px;
-      background-color: var(--primary-color);
-      color: var(--secondary-color);
-      text-align: center;
-    }
+.weather-card .main {
+    color: var(--primary-color);
+    padding: 15px;
+}
 
-    .weather-card .main {
-      padding: 15px;
-      color: var(--primary-color);
-    }
+.weather-card .main .item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
 
-    .weather-card .main ul {
-      list-style: none;
-      padding: 0;
-      margin: 0;
-    }
+.weather-card .main .item .visualization {
+    margin-right: 8px;
+}
 
-    .weather-card .main ul li {
-      display: flex;
-      align-items: center;
-      margin-bottom: 10px;
-    }
+.weather-card .main .item .visualization i {
+    margin-right: 8px;
+    opacity: 0.3;
+}
 
-    .weather-card .main ul li:last-child {
-      margin-bottom: 0;
-    }
+.weather-card .main .item .text {
+    display: flex;
+    align-items: center; /* Vertically aligns text with the icon */
+    flex-grow: 1; /* Allows text container to fill the available space */
+}
 
-    .weather-card .main ul li i,
-    .weather-card .main ul li img {
-      flex-shrink: 0;
-      font-size: 24px;
-      /* For Material Icons */
-      margin-right: 8px;
-    }
+.weather-card .main .item .text .label {
+    opacity: 0.7;
+}
 
-    .weather-card .main ul li img {
-      width: 48px;
-      /* For images */
-      height: 48px;
-      /* For images */
-    }
+.weather-card .main .item .text .data {
+    margin-left: auto; 
+}
 
-    .weather-card .main ul li span {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
+
+
+
   </style>
 </head>
 
@@ -251,35 +246,37 @@
       // Main content area
       const main = document.createElement('div');
       main.className = 'main';
-      const ul = document.createElement('ul');
 
       // Temperature item
-      const tempItem = document.createElement('li');
-      tempItem.innerHTML = `<i class="material-icons">thermostat</i><span>Temperature: ${Math.round(openweatherdata.main.temp * 10) / 10}°C<br>Feels like ${Math.round(openweatherdata.main.feels_like * 10) / 10}°C</span>`;
+      const tempItem = document.createElement('div');
+      tempItem.className = 'item';
+      tempItem.innerHTML = `<div class="visualization"><i class="material-icons">thermostat</i></div><div class="text"><span class="label">Temperature:</span><span class="data">${Math.round(openweatherdata.main.temp * 10) / 10}°C</span></div>`;
 
       // Humidity item
-      const humidityItem = document.createElement('li');
-      humidityItem.innerHTML = `<i class="material-icons">water_drop</i><span>Humidity: ${openweatherdata.main.humidity}%</span>`;
+      const humidityItem = document.createElement('div');
+      humidityItem.className = 'item';
+      humidityItem.innerHTML = `<div class="visualization"><i class="material-icons">water_drop</i></div><div class="text"><span class="label">Humidity:</span><span class="data">${openweatherdata.main.humidity}%</span></div>`;
 
       // Weather condition item
-      const conditionItem = document.createElement('li');
+      const conditionItem = document.createElement('div');
+      conditionItem.className = 'item';
       const iconCode = openweatherdata.weather[0].icon; // Assuming there's at least one weather condition present
-      conditionItem.innerHTML = `<img src="https://openweathermap.org/img/wn/${iconCode}.png" alt="Weather Icon"><span>${openweatherdata.weather[0].main}</span>`;
+      conditionItem.innerHTML = `<div class="visualization"><img src="https://openweathermap.org/img/wn/${iconCode}.png" alt="Weather Icon"></div><div class="text"><span class="data">${openweatherdata.weather[0].main}</span></div>`;
 
       // Daylight item
-      const daylightItem = document.createElement('li');
+      const daylightItem = document.createElement('div');
+      daylightItem.className = 'item';
       let daylightAfter5PM = calculateDaylightAfter5PM(openweatherdata);
       let daylightText = daylightAfter5PM > 0 ? convertSecondsToFractionalHours(daylightAfter5PM) : '-';
-      daylightItem.innerHTML = `<i class="material-icons">wb_sunny</i><span>after 5 pm: ${daylightText}</span>`;
+      daylightItem.innerHTML = `<div class="visualization"><i class="material-icons">wb_sunny</i></div><div class="text"><span class="label">after 5 pm:</span><span class="data">${daylightText}</span></div>`;
 
       // Append items to the list
-      ul.appendChild(conditionItem);
-      ul.appendChild(tempItem);
-      ul.appendChild(humidityItem);
-      ul.appendChild(daylightItem);
+      main.appendChild(conditionItem);
+      main.appendChild(tempItem);
+      main.appendChild(humidityItem);
+      main.appendChild(daylightItem);
 
       // Append elements to main content area and card
-      main.appendChild(ul);
       card.appendChild(header);
       card.appendChild(main);
 
