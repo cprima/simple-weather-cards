@@ -1,5 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+<!DOCTYPE html>
+<!-- 
+    Weather Display Webpage
+    Author: Christian Prior-Mamulyan
+    Version: 2.1
+    Date: 2024-03-10
+    Sourcecode: https://github.com/cprima/simple-weather-cards
+    Description: This webpage dynamically generates weather cards with daylight information after 5 PM for cities worldwide, using OpenWeatherMap API data. It aims to foster empathy and connection within global project teams by sharing local weather conditions at the beginning of online meetings.
+    License: Creative Commons Attribution (CC BY)
+    Note: This work is licensed under a Creative Commons Attribution 4.0 International License. For more details, visit https://creativecommons.org/licenses/by/4.0/
+ -->
 
 <head>
   <meta charset="UTF-8">
@@ -30,24 +41,12 @@
       width: 100%;
       height: var(--header-height);
       background-color: var(--primary-color);
-      /*position: fixed;
-      top: 0;
-      left: 0;
-      z-index: 1000; */
     }
 
     .main-content {
       display: flex;
       flex-direction: column;
-      /* Stacks children vertically */
       justify-content: center;
-      /* Centers children vertically */
-      /*padding-top: calc(var(--header-height));
-      padding-bottom: var(--footer-height);
-      height: calc(100vh - var(--header-height) - var(--footer-height));
-      overflow: auto;
-      position: relative;
-      z-index: 1;*/
       padding-top: var(--main-content-padding-top);
     }
 
@@ -62,10 +61,6 @@
       width: 100%;
       height: var(--footer-height);
       background-color: var(--secondary-color);
-      /* position: fixed;
-      bottom: 0;
-      left: 0;
-      z-index: 1000; */
     }
 
     .footer-content {
@@ -271,10 +266,17 @@
       const iconCode = openweatherdata.weather[0].icon; // Assuming there's at least one weather condition present
       conditionItem.innerHTML = `<img src="https://openweathermap.org/img/wn/${iconCode}.png" alt="Weather Icon"><span>${openweatherdata.weather[0].main}</span>`;
 
+      // Daylight item
+      const daylightItem = document.createElement('li');
+      let daylightAfter5PM = calculateDaylightAfter5PM(openweatherdata);
+      let daylightText = daylightAfter5PM > 0 ? convertSecondsToFractionalHours(daylightAfter5PM) : '-';
+      daylightItem.innerHTML = `<i class="material-icons">wb_sunny</i><span>after 5 pm: ${daylightText}</span>`;
+
       // Append items to the list
       ul.appendChild(conditionItem);
       ul.appendChild(tempItem);
       ul.appendChild(humidityItem);
+      ul.appendChild(daylightItem);
 
       // Append elements to main content area and card
       main.appendChild(ul);
@@ -299,6 +301,76 @@
       return `#${mixedColor}`;
     }
 
+    function calculateDaylightAfter5PM(city) {
+      //console.log(`Calculating daylight after 5 PM for city: ${city.name}`);
+
+      // Calculate local time for sunset and 5 PM using the city's timezone offset
+      const sunsetLocal = new Date((city.sys.sunset + city.sys.timezone) * 1000);
+      const fivePMLocal = new Date(sunsetLocal);
+      fivePMLocal.setUTCHours(17, 0, 0, 0); // Set time to 17:00 UTC which is equivalent to 5 PM local
+      fivePMLocal.setUTCDate(sunsetLocal.getUTCDate()); // Ensure 5 PM is on the same day as sunset
+
+      // Debug output
+      //console.log(`Local sunset time: ${formatDateTimeWithTimezone(sunsetLocal)}`);
+      //console.log(`Local 5 PM time: ${formatDateTimeWithTimezone(fivePMLocal)}`);
+
+      // Calculate the difference in milliseconds
+      const diffMs = sunsetLocal - fivePMLocal;
+      const diffSeconds = diffMs > 0 ? diffMs / 1000 : 0; // Convert to seconds, ensure non-negative
+
+      // More debug output
+      /*if (diffSeconds > 0) {
+        console.log(`Daylight after 5 PM: ${diffSeconds} seconds`);
+      } else {
+        console.log("It is already dark at 5 PM.");
+      }*/
+
+      return diffSeconds;
+    }
+
+
+    function formatDateTimeWithTimezone(date) {
+      const options = {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        timeZoneName: 'short'
+      };
+      return date.toLocaleString('en-US', options);
+    }
+
+
+    function convertSecondsToFractionalHours(seconds) {
+      // Convert seconds to hours as a decimal
+      let decimalHours = seconds / 3600;
+
+      // Extract the whole hour part
+      let wholeHours = Math.floor(decimalHours);
+
+      // Find the decimal part to determine the fraction
+      let decimalPart = decimalHours - wholeHours;
+
+      // Determine the closest fraction
+      let fraction = "";
+      if (decimalPart > 0) {
+        if (decimalPart <= 1 / 4) {
+          fraction = "¼";
+        } else if (decimalPart <= 1 / 2) {
+          fraction = "½";
+        } else if (decimalPart <= 3 / 4) {
+          fraction = "¾";
+        } else {
+          // If the decimal part is closer to 1 than to 3/4, increment wholeHours
+          wholeHours += 1;
+        }
+      }
+
+      // Construct the final string
+      let result = wholeHours.toString();
+      if (fraction) {
+        result += fraction;
+      }
+      return result + " h";
+    }
 
   </script>
 
