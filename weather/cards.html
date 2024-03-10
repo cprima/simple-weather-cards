@@ -1,290 +1,307 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Weather Display</title>
-    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weather Display</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <style>
+    :root {
+      --primary-color: #cb4b16;
+      --secondary-color: #eee8d5;
+      --header-height: 4px;
+      --footer-height: 60px;
+      --main-content-padding-top: 20px;
+      --footer-link-color: #CCCCCC;
+    }
 
-:root {
-    --primary-color: #cb4b16;
-    --secondary-color: #fdf6e3;
-    --header-height: 4px;
-    --footer-height: 60px;
-    --footer-link-color: #CCCCCC;
-}
+    body,
+    html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background-color: var(--secondary-color);
+    }
 
-body {
-  font-family: 'Open Sans', sans-serif;
-  background-color: var(--secondary-color);
-  margin: 0;
-  padding-top: var(--header-height); /* Space for the header */
-  padding-bottom: var(--footer-height); /* Space for the footer */
-  box-sizing: border-box;
-  position: relative;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
+    header {
+      width: 100%;
+      height: var(--header-height);
+      background-color: var(--primary-color);
+      /*position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1000; */
+    }
 
-header {
-  background-color: var(--primary-color);
-  height: var(--header-height);
-  width: 100%;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 2;
-}
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      /* Stacks children vertically */
+      justify-content: center;
+      /* Centers children vertically */
+      /*padding-top: calc(var(--header-height));
+      padding-bottom: var(--footer-height);
+      height: calc(100vh - var(--header-height) - var(--footer-height));
+      overflow: auto;
+      position: relative;
+      z-index: 1;*/
+      padding-top: var(--main-content-padding-top);
+    }
 
-.main-content {
-  flex-grow: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 20px;
+    }
 
-.container {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 20px;
-  position: relative;
-  z-index: 1;
-}
+    footer#site-footer {
+      width: 100%;
+      height: var(--footer-height);
+      background-color: var(--secondary-color);
+      /* position: fixed;
+      bottom: 0;
+      left: 0;
+      z-index: 1000; */
+    }
 
-.card {
-  width: 256px;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--primary-color);
-  border-radius: 4px;
-  overflow: hidden;
-  background-color: #FFF;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-}
+    .footer-content {
+      color: var(--footer-link-color);
+      display: flex;
+      justify-content: space-evenly;
+      align-items: center;
+      height: 100%;
+    }
 
-.card-header {
-  background-color: var(--primary-color); /* Background to primary for visibility */
-  color: var(--secondary-color); /* Text color to secondary for contrast */
-  text-align: center;
-  font-weight: 600;
-  font-size: 1.5rem;
-  padding: 10px;
-}
-
-.card-main {
-  padding: 15px 10px;
-  background-color: var(--secondary-color); /* Background to secondary color */
-}
-
-.material-icons, .temperature-text, .weather-description {
-  color: var(--primary-color); /* Text elements to primary for visibility */
-}
-
-footer {
-  /*background-color: var(--primary-color);*/
-  color: #FFFFFF;
-  text-align: center;
-  font-size: 0.75rem;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  height: var(--footer-height);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 2;
-}
-
-.footer-content {
-  color: var(--footer-link-color);
-  display: flex;
-  justify-content: space-around;
-  width: 100%;
-  max-width: 1200px;
-}
-
-.footer-link {
-  color: var(--footer-link-color);
-  text-decoration: none;
-  margin: 0 10px;
-}
+    .footer-link {
+      color: var(--footer-link-color);
+      text-decoration: none;
+    }
 
 
-    </style>
+    .weather-card {
+      display: flex;
+      flex-direction: column;
+      min-width: 250px;
+      max-width: 300px;
+      background-color: var(--secondary-color);
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .weather-card .header {
+      padding: 15px;
+      background-color: var(--primary-color);
+      color: var(--secondary-color);
+      text-align: center;
+    }
+
+    .weather-card .main {
+      padding: 15px;
+      color: var(--primary-color);
+    }
+
+    .weather-card .main ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .weather-card .main ul li {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .weather-card .main ul li:last-child {
+      margin-bottom: 0;
+    }
+
+    .weather-card .main ul li i,
+    .weather-card .main ul li img {
+      flex-shrink: 0;
+      font-size: 24px;
+      /* For Material Icons */
+      margin-right: 8px;
+    }
+
+    .weather-card .main ul li img {
+      width: 48px;
+      /* For images */
+      height: 48px;
+      /* For images */
+    }
+
+    .weather-card .main ul li span {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+  </style>
 </head>
+
 <body>
 
-<header>&nbsp;</header>
-<div class="main-content">
-<div id="root" class="container"></div>
-</div>
-<footer id="site-footer">
-  <div class="footer-content">
-    <span id="cache-age">Cache Age: Loading...</span>
-    <a href="https://github.com/cprima/simple-weather-cards" target="_blank" class="footer-link">GitHub Repository</a>
-    <a href="https://cpr.in-berlin.de/weather/" class="footer-link">0</a>
-    <a href="https://cpr.in-berlin.de/weather/?cities=2946447,3067696,1264527,6697380&primaryColor=D40511&secondaryColor=FFCC00" class="footer-link">A</a>
-    <a href="https://cpr.in-berlin.de/weather/?cities=2946447,2806654,1273294,1264527&primaryColor=D40511&secondaryColor=FFCC00" class="footer-link">B</a>
+  <header>&nbsp;</header>
+  <div class="main-content">
+    <div id="weathercards" class="container"></div>
   </div>
-</footer>
+  <footer id="site-footer">
+    <div class="footer-content">
+      <span id="cache-age">Cache: Loading...</span>
+      <a href="https://github.com/cprima/simple-weather-cards" target="_blank" class="footer-link">GitHub Repository</a>
+      <a href="https://cpr.in-berlin.de/weather/" class="footer-link">0</a>
+      <a href="https://cpr.in-berlin.de/weather/?cities=2946447,3067696,1264527,6697380&primaryColor=D40511&secondaryColor=FFCC00&padTop=120px"
+        class="footer-link">A</a>
+      <a href="https://cpr.in-berlin.de/weather/?cities=2946447,2806654,1273294,1264527&primaryColor=D40511&secondaryColor=FFCC00&padTop=120px"
+        class="footer-link">B</a>
+    </div>
+  </footer>
 
-<script>
+  <script>
 
-// Mapping of city IDs to custom display names
-const cityIdToNameMapping = {
-    "6697380": "Cyberjaya",
-};
+    // Mapping of city IDs to custom display names
+    const cityIdToNameMapping = {
+      "6697380": "Cyberjaya",
+      "2866375": "Rittershausen",
+    };
 
-document.addEventListener("DOMContentLoaded", () => {
-    const app = document.getElementById('root');
-    app.className = 'container';
-    const footer = document.getElementById('cache-info');
-    const queryString = window.location.search;
-    const urlParams = new URLSearchParams(queryString);
-    //let cities = '2946447,2806654,1273294,1264527';
-    //let cities = '2946447,3067696,1264527,6697380';
-    //let cities = '2806654,616052';
-    let cities = '2857458,2806654,616052,611717';
-    // Default colors
-    // Extract color values from URL parameters, prepending '#' to denote color values
-    let primaryColor = `#${urlParams.get('primaryColor') || 'cb4b16'}`; // Default to Solarized orange if not specified
-    let secondaryColor = `#${urlParams.get('secondaryColor') || 'fdf6e3'}`; // Default to Solarized base3 if not specified
-    // Apply the colors to CSS variables
-    document.documentElement.style.setProperty('--primary-color', primaryColor);
-    document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+    document.addEventListener("DOMContentLoaded", () => {
+      const app = document.getElementById('weathercards');
+      app.className = 'container';
+      const footer = document.getElementById('cache-info');
+      const queryString = window.location.search;
+      const urlParams = new URLSearchParams(queryString);
+      let cities = '2857458,2806654,2866375,616530,617026,611717';
+
+      // colors
+      let primaryColor = `#${urlParams.get('primaryColor') || 'cb4b16'}`; // Default to Solarized orange if not specified
+      let secondaryColor = `#${urlParams.get('secondaryColor') || 'eee8d5'}`; // Default to Solarized base2 if not specified
+      const footerLinkColor = mixWithBlack(secondaryColor.slice(1), 4);
+      let padTop = `${urlParams.get('padTop') || '20px'}`;
+      document.documentElement.style.setProperty('--primary-color', primaryColor);
+      document.documentElement.style.setProperty('--secondary-color', secondaryColor);
+      document.documentElement.style.setProperty('--footer-link-color', footerLinkColor);
+      document.documentElement.style.setProperty('--main-content-padding-top', padTop);
+
+      if (urlParams.has('cities')) {
+        cities = urlParams.get('cities');
+      }
+
+      // Adjust this URL to point to your PHP proxy script
+      const apiUrl = `/weather/openweathermap_proxy.php?ids=${cities}`;
+
+      fetch(apiUrl)
+        .then(response => {
+          // Access custom headers
+          const cacheState = response.headers.get('X-Cache');
+          let cacheAge = response.headers.get('X-Cache-Age');
+          console.log(`Cache State: ${cacheState}, Cache Age: ${cacheAge} seconds`);
+          // Handle an unset 'X-Cache-Age'
+          if (cacheAge === null) {
+            cacheAge = 'Unavailable'; // or any default/fallback message you prefer
+          } else {
+            cacheAge = 'Age ' + cacheAge + ' seconds'; // Append 'seconds' only if the cache age is available
+          }
+
+          // Update the cache age display
+          const cacheAgeSpan = document.getElementById('cache-age');
+          cacheAgeSpan.textContent = `Cache: ${cacheAge}`;
+
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => {
+          if (data.error) {
+            console.error('Error fetching weather data:', data.details);
+            // Handle error in UI, e.g., show an error message
+          } else {
+            data.list.forEach(weatherData => {
+              const card = createWeatherCard(weatherData); // Capture the returned card
+              app.appendChild(card); // Append the card to the 'app' container
+            });
+          }
+        })
+        .catch(error => console.error("Error fetching weather data:", error));
+
+    });
+
+    function getCityDisplayName(cityId, defaultName) {
+      // Check if the cityId exists in the mapping, return the custom name if it does
+      // Otherwise, return the default name from OpenWeatherMap
+      return cityIdToNameMapping[cityId] || defaultName;
+    }
+
+    function createWeatherCard(openweatherdata) {
+
+      const cityId = openweatherdata.id.toString();
+      const defaultCityName = openweatherdata.name;
+      const displayName = getCityDisplayName(cityId, defaultCityName);
+
+      // Create the card container
+      const card = document.createElement('div');
+      card.className = 'weather-card';
+
+      // Header with city name
+      const header = document.createElement('div');
+      header.className = 'header';
+      header.textContent = displayName
+
+      // Main content area
+      const main = document.createElement('div');
+      main.className = 'main';
+      const ul = document.createElement('ul');
+
+      // Temperature item
+      const tempItem = document.createElement('li');
+      tempItem.innerHTML = `<i class="material-icons">thermostat</i><span>Temperature: ${Math.round(openweatherdata.main.temp * 10) / 10}°C<br>Feels like ${Math.round(openweatherdata.main.feels_like * 10) / 10}°C</span>`;
+
+      // Humidity item
+      const humidityItem = document.createElement('li');
+      humidityItem.innerHTML = `<i class="material-icons">water_drop</i><span>Humidity: ${openweatherdata.main.humidity}%</span>`;
+
+      // Weather condition item
+      const conditionItem = document.createElement('li');
+      const iconCode = openweatherdata.weather[0].icon; // Assuming there's at least one weather condition present
+      conditionItem.innerHTML = `<img src="https://openweathermap.org/img/wn/${iconCode}.png" alt="Weather Icon"><span>${openweatherdata.weather[0].main}</span>`;
+
+      // Append items to the list
+      ul.appendChild(conditionItem);
+      ul.appendChild(tempItem);
+      ul.appendChild(humidityItem);
+
+      // Append elements to main content area and card
+      main.appendChild(ul);
+      card.appendChild(header);
+      card.appendChild(main);
+
+      return card;
+    }
+
 
     // Function to mix the secondary color with black (80% secondary color, 20% black)
     function mixWithBlack(color, percentage) {
-        const percent = percentage / 100;
-        // Parse the hex color
-        const [r, g, b] = color.match(/\w\w/g).map(x => parseInt(x, 16));
-        // Calculate the mixed color
-        const mixedColor = [
-            Math.round(r * (1 - percent)).toString(16).padStart(2, '0'),
-            Math.round(g * (1 - percent)).toString(16).padStart(2, '0'),
-            Math.round(b * (1 - percent)).toString(16).padStart(2, '0')
-        ].join('');
-        return `#${mixedColor}`;
+      const percent = percentage / 100;
+      // Parse the hex color
+      const [r, g, b] = color.match(/\w\w/g).map(x => parseInt(x, 16));
+      // Calculate the mixed color
+      const mixedColor = [
+        Math.round(r * (1 - percent)).toString(16).padStart(2, '0'),
+        Math.round(g * (1 - percent)).toString(16).padStart(2, '0'),
+        Math.round(b * (1 - percent)).toString(16).padStart(2, '0')
+      ].join('');
+      return `#${mixedColor}`;
     }
 
-    // Compute the mixed footer link color
-    const footerLinkColor = mixWithBlack(secondaryColor.slice(1), 10);
 
-    // Apply the mixed color to footer links
-    document.documentElement.style.setProperty('--footer-link-color', footerLinkColor);
-
-
-    if (urlParams.has('cities')) {
-        cities = urlParams.get('cities');
-    }
-
-    // Adjust this URL to point to your PHP proxy script
-    const apiUrl = `/weather/openweathermap_proxy.php?ids=${cities}`;
-
-fetch(apiUrl)
-    .then(response => {
-        // Access custom headers
-        const cacheState = response.headers.get('X-Cache');
-        let cacheAge = response.headers.get('X-Cache-Age');
-        console.log(`Cache State: ${cacheState}, Cache Age: ${cacheAge} seconds`);
-        // Handle an unset 'X-Cache-Age'
-        if (cacheAge === null) {
-            cacheAge = 'Unavailable'; // or any default/fallback message you prefer
-        } else {
-            cacheAge += ' seconds'; // Append 'seconds' only if the cache age is available
-        }
-
-        // Update the cache age display
-        const cacheAgeSpan = document.getElementById('cache-age');
-        cacheAgeSpan.textContent = `Cache Age: ${cacheAge}`;
-
-        if (!response.ok) {
-            throw new Error('Network response was not ok');
-        }
-        return response.json();
-    })
-    .then(data => {
-        if (data.error) {
-            console.error('Error fetching weather data:', data.details);
-            // Handle error in UI, e.g., show an error message
-        } else {
-            data.list.forEach(weatherData => app.appendChild(createWeatherCard(weatherData)));
-        }
-    })
-    .catch(error => console.error("Error fetching weather data:", error));
-
-});
-
-function getCityDisplayName(cityId, defaultName) {
-    // Check if the cityId exists in the mapping, return the custom name if it does
-    // Otherwise, return the default name from OpenWeatherMap
-    return cityIdToNameMapping[cityId] || defaultName;
-}
-
-function createWeatherCard(weatherData) {
-    const cityId = weatherData.id.toString(); // Ensure cityId is a string to match keys in the mapping
-    const defaultCityName = weatherData.name;
-    const displayName = getCityDisplayName(cityId, defaultCityName);
-
-    const card = document.createElement('div');
-    card.className = 'card';
-    card.appendChild(createCardHeader(displayName));
-    card.appendChild(createCardMain(weatherData));
-    return card;
-}
-
-function createCardHeader(cityName) {
-    const header = document.createElement('div');
-    header.className = 'card-header';
-    header.textContent = cityName;
-    return header;
-}
-
-function createCardMain(weatherData) {
-    const main = document.createElement('div');
-    main.className = 'card-main';
-    main.style.display = 'flex';
-    main.style.flexDirection = 'column';
-    main.style.alignItems = 'center';
-    main.appendChild(createTemperatureElement(weatherData.main.temp));
-    main.appendChild(createWeatherIconElement(weatherData.weather[0].icon, weatherData.weather[0].description));
-    main.appendChild(createDescriptionElement(weatherData.weather[0].description));
-    return main;
-}
-
-function createTemperatureElement(temp) {
-    const temperatureContainer = document.createElement('div');
-    temperatureContainer.className = 'temperature-container';
-    const iconElem = document.createElement('i');
-    iconElem.className = 'material-icons';
-    iconElem.textContent = 'thermostat';
-    const tempText = document.createElement('span');
-    tempText.className = 'temperature-text';
-    tempText.textContent = `${Math.round(temp * 10) / 10}°C`;
-    temperatureContainer.appendChild(iconElem);
-    temperatureContainer.appendChild(tempText);
-    return temperatureContainer;
-}
-
-function createWeatherIconElement(iconCode, altText) {
-    const iconImg = document.createElement('img');
-    iconImg.src = `https://openweathermap.org/img/wn/${iconCode}.png`;
-    iconImg.alt = altText;
-    return iconImg;
-}
-
-function createDescriptionElement(descriptionText) {
-    const descriptionDiv = document.createElement('div');
-    descriptionDiv.className = 'weather-description';
-    descriptionDiv.textContent = descriptionText;
-    return descriptionDiv;
-}
-
-</script>
+  </script>
 
 </body>
+
 </html>
