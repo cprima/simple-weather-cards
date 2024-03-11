@@ -146,6 +146,53 @@
       fill: var(--primary-color);
       opacity: 0.05;
     }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0.1;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    .weather-card {
+      animation-name: fadeIn;
+      animation-duration: 2s;
+      /* animation-delay will be set in JavaScript */
+      animation-fill-mode: forwards;
+      opacity: 0;
+      /*transform-origin: top;*/
+      /*overflow: hidden;*/
+      /* Prevent content from overflowing during animation */
+    }
+
+    @keyframes rollUp {
+      0% {
+        opacity: 1;
+        transform: scaleY(1);
+      }
+
+      100% {
+        opacity: 0;
+        transform: scaleY(0);
+      }
+    }
+
+    @keyframes fadeOut {
+      from {
+        opacity: 1;
+      }
+
+      to {
+        opacity: 0;
+      }
+    }
+
+    .fade-out {
+      animation: fadeOut 0.5s forwards;
+    }
   </style>
 </head>
 
@@ -185,12 +232,24 @@
     };
 
     document.addEventListener("DOMContentLoaded", () => {
+      // Initial load of weather cards
+      loadWeatherCards();
+
+      // Refresh the weather cards every x minutes in milliseconds
+      const refreshInterval = 1 * 60 * 1000;
+      setInterval(loadWeatherCards, refreshInterval);
+    });
+
+    function loadWeatherCards() {
       const app = document.getElementById('weathercards');
-      app.className = 'container';
-      const footer = document.getElementById('cache-info');
       const queryString = window.location.search;
       const urlParams = new URLSearchParams(queryString);
+
+      // locations to show
       let cities = '2857458,2806654,2866375,616530,617026,611717';
+      if (urlParams.has('cities')) {
+        cities = urlParams.get('cities');
+      }
 
       // colors
       let primaryColor = `#${urlParams.get('primaryColor') || 'cb4b16'}`; // Default to Solarized orange if not specified
@@ -202,57 +261,52 @@
       document.documentElement.style.setProperty('--footer-link-color', footerLinkColor);
       document.documentElement.style.setProperty('--main-content-padding-top', padTop);
 
-      if (urlParams.has('cities')) {
-        cities = urlParams.get('cities');
-      }
-
-      // Adjust this URL to point to your PHP proxy script
+      // pointing to local proxy script
       const apiUrl = `/weather/openweathermap_proxy.php?ids=${cities}`;
 
-      fetch(apiUrl)
-        .then(response => {
-          // Access custom headers
-          const cacheState = response.headers.get('X-Cache');
-          let cacheAge = response.headers.get('X-Cache-Age');
-          console.log(`Cache State: ${cacheState}, Cache Age: ${cacheAge} seconds`);
-          // Handle an unset 'X-Cache-Age'
-          if (cacheAge === null) {
-            cacheAge = 'Unavailable'; // or any default/fallback message you prefer
-          } else {
-            cacheAge = 'Age ' + cacheAge + ' seconds'; // Append 'seconds' only if the cache age is available
-          }
+      app.classList.add('fade-out');
+      setTimeout(() => {
+        app.classList.remove('fade-out');
+        app.innerHTML = '';
 
-          // Update the cache age display
-          const cacheAgeSpan = document.getElementById('cache-age');
-          cacheAgeSpan.textContent = `Cache: ${cacheAge}`;
+        fetch(apiUrl)
+          .then(response => {
+            // Access custom headers
+            const cacheState = response.headers.get('X-Cache');
+            let cacheAge = response.headers.get('X-Cache-Age');
+            console.log(`Cache State: ${cacheState}, Cache Age: ${cacheAge} seconds`);
+            // Handle an unset 'X-Cache-Age'
+            if (cacheAge === null) {
+              cacheAge = 'Unavailable'; // or any default/fallback message you prefer
+            } else {
+              cacheAge = 'Age ' + cacheAge + ' seconds'; // Append 'seconds' only if the cache age is available
+            }
 
-          if (!response.ok) {
-            throw new Error('Network response was not ok');
-          }
-          return response.json();
-        })
-        .then(data => {
-          if (data.error) {
-            console.error('Error fetching weather data:', data.details);
-            // Handle error in UI, e.g., show an error message
-          } else {
-            data.list.forEach(weatherData => {
-              const card = createWeatherCard(weatherData); // Capture the returned card
-              app.appendChild(card); // Append the card to the 'app' container
-            });
-          }
-        })
-        .catch(error => console.error("Error fetching weather data:", error));
+            // Update the cache age display
+            const cacheAgeSpan = document.getElementById('cache-age');
+            cacheAgeSpan.textContent = `Cache: ${cacheAge}`;
 
-    });
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            return response.json();
+          })
+          .then(data => {
+            if (data.error) {
+              console.error('Error fetching weather data:', data.details);
+              // Handle error in UI, e.g., show an error message
+            } else {
+              data.list.forEach((weatherData, index) => {
+                const card = createWeatherCard(weatherData, index); // Capture the returned card
+                app.appendChild(card); // Append the card to the 'app' container
+              });
+            }
+          })
+          .catch(error => console.error("Error fetching weather data:", error));
+      }, 500); // This delay should match the duration of the fade-out animation
+    };
 
-    function getCityDisplayName(cityId, defaultName) {
-      // Check if the cityId exists in the mapping, return the custom name if it does
-      // Otherwise, return the default name from OpenWeatherMap
-      return cityIdToNameMapping[cityId] || defaultName;
-    }
-
-    function createWeatherCard(openweatherdata) {
+    function createWeatherCard(openweatherdata, index) {
 
       const cityId = openweatherdata.id.toString();
       const defaultCityName = openweatherdata.name;
@@ -260,9 +314,15 @@
 
       // Create the card container
       const card = document.createElement('div');
+      card.id = `weather-card-${cityId}`;
+      card.setAttribute('data-city-id', cityId);
       card.className = 'weather-card';
 
-      // Header with city name
+      // Calculate delay based on index (e.g., 0.1s between each card)
+      const delay = index * 200; // 200ms between cards
+      card.style.animationDelay = `${delay}ms`;
+
+      // Header with city name and local time
       const header = document.createElement('div');
       header.className = 'header';
       const localTime = calculateLocalTime(openweatherdata.sys.timezone);
@@ -309,6 +369,12 @@
       card.appendChild(main);
 
       return card;
+    }
+
+    function getCityDisplayName(cityId, defaultName) {
+      // Check if the cityId exists in the mapping, return the custom name if it does
+      // Otherwise, return the default name from OpenWeatherMap
+      return cityIdToNameMapping[cityId] || defaultName;
     }
 
 
@@ -385,9 +451,6 @@
 
       return `${formattedHours}:${formattedMinutes}`;
     }
-
-
-
 
     function convertSecondsToFractionalHours(seconds) {
       // Convert seconds to hours as a decimal
