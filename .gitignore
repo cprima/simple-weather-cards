@@ -1,0 +1,10 @@
+# Ignore everything
+*
+
+# But not these directories and files
+!/.gitignore
+!/weather/**
+!/README.md
+!/LICENCE.md
+!/AUTHORS.md
+
