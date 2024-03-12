@@ -338,12 +338,14 @@
       // Temperature item
       const tempItem = document.createElement('div');
       tempItem.className = 'item';
-      tempItem.innerHTML = `<div class="visualization"><i class="material-icons">thermostat</i></div><div class="text"><span class="label">Temperature:</span><span class="data">${Math.round(openweatherdata.main.temp * 10) / 10}°C</span></div>`;
+      //let temp = Math.round(openweatherdata.main.temp * 10) / 10;
+      let temp = Math.round(openweatherdata.main.temp);
+      tempItem.innerHTML = `<div class="visualization"><i class="material-icons">thermostat</i></div><div class="text"><span class="label">Temperature:</span><span class="data">${temp}°C</span></div>`;
 
       // Humidity item
       const humidityItem = document.createElement('div');
       humidityItem.className = 'item';
-      humidityItem.innerHTML = `<div class="visualization"><i class="material-icons">water_drop</i></div><div class="text"><span class="label">Humidity:</span><span class="data">${openweatherdata.main.humidity}%</span></div>`;
+      humidityItem.innerHTML = `<div class="visualization"><i class="material-icons">water_drop</i></div><div class="text"><span class="label">Humidity:</span><span class="data">${roundHumidity(openweatherdata.main.humidity)}%</span></div>`;
 
       // Weather condition item
       const conditionItem = document.createElement('div');
@@ -356,13 +358,21 @@
       daylightItem.className = 'item';
       let daylightAfter5PM = calculateDaylightAfter5PM(openweatherdata);
       let daylightText = daylightAfter5PM > 0 ? convertSecondsToFractionalHours(daylightAfter5PM) : '-';
-      daylightItem.innerHTML = `<div class="visualization"><i class="material-icons">wb_sunny</i></div><div class="text"><span class="label">after 5 pm:</span><span class="data">${daylightText}</span></div>`;
+      daylightItem.innerHTML = `<div class="visualization"><i class="material-icons">wb_twilight</i></div><div class="text"><span class="label">after 5 pm:</span><span class="data">${daylightText}</span></div>`;
+
+      // solar noon
+      const solarnoonItem = document.createElement('div');
+      solarnoonItem.className = 'item';
+      let solarNoon = calculateSolarNoon(openweatherdata);
+      let foo = calculateLocalTimeFromTimestamp(solarNoon, openweatherdata.sys.timezone);
+      solarnoonItem.innerHTML = `<div class="visualization"><i class="material-icons">wb_sunny</i></div><div class="text"><span class="label">true noon:</span><span class="data">${foo}</span></div>`;
 
       // Append items to the list
       main.appendChild(conditionItem);
       main.appendChild(tempItem);
       main.appendChild(humidityItem);
       main.appendChild(daylightItem);
+      main.appendChild(solarnoonItem);
 
       // Append elements to main content area and card
       card.appendChild(header);
@@ -452,6 +462,26 @@
       return `${formattedHours}:${formattedMinutes}`;
     }
 
+    function calculateLocalTimeFromTimestamp(unixTimestamp, timezoneOffset) {
+      // Convert the Unix timestamp to milliseconds and create a Date object
+      const specifiedTime = new Date(unixTimestamp * 1000);
+    
+      // Calculate the local time taking into account the timezoneOffset
+      // This creates a new Date object adjusted for the timezone offset
+      const localTime = new Date(specifiedTime.getTime() + timezoneOffset * 1000);
+    
+      // Format the hour and minute, ensuring hours are correctly adjusted for midnight
+      let hours = localTime.getUTCHours(); // Use getUTCHours to ignore the local timezone of the JS environment
+      let minutes = localTime.getUTCMinutes(); // Use getUTCMinutes for consistency
+    
+      // Ensure hours and minutes are two digits
+      const formattedHours = hours.toString().padStart(2, '0');
+      const formattedMinutes = minutes.toString().padStart(2, '0');
+    
+      return `${formattedHours}:${formattedMinutes}`;
+    }
+    
+
     function convertSecondsToFractionalHours(seconds) {
       // Convert seconds to hours as a decimal
       let decimalHours = seconds / 3600;
@@ -484,6 +514,26 @@
       }
       return result + " h";
     }
+
+    function calculateSolarNoon(openWeatherData) {
+      // Extract sunrise and sunset times from the provided data
+      const { sunrise, sunset } = openWeatherData.sys;
+  
+      // Calculate the midpoint between sunrise and sunset
+      const solarNoonTimestamp = sunrise + ((sunset - sunrise) / 2);
+  
+      return solarNoonTimestamp;
+  }
+
+  function roundHumidity(humidity) {
+    if (humidity <= 95) {
+        // Round to the nearest multiple of 5
+        return Math.round(humidity / 5) * 5;
+    } else {
+        // Round to the nearest full number if above 95
+        return Math.round(humidity);
+    }
+}
 
   </script>
 

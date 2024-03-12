@@ -35,7 +35,7 @@ $cityIds = isset($_GET['ids']) && !empty($_GET['ids']) ? $_GET['ids'] : $default
 // Cache parameters
 $cacheFileName = 'weather_cache_' . md5($cityIds) . '.json'; // Unique file name
 $cacheFile = __DIR__ . '/cache/' . $cacheFileName; // Ensure the 'cache' directory exists and is writable
-$cacheTime = 300; // Cache duration in seconds
+$cacheTime = 303; // Cache duration in seconds
 
 $cacheAge = file_exists($cacheFile) ? time() - filemtime($cacheFile) : $cacheTime;
 
