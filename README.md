@@ -1,6 +1,8 @@
-# Simple HTML Weather Display 
+# Simple HTML Weather Display
 
-This project is a simple web application that displays weather information for predefined cities. It leverages OpenWeatherMap's API to fetch weather data and presents it in a user-friendly web interface. The application includes a PHP proxy to securely handle API requests without exposing the API key on the client side. It also features a basic caching mechanism to enhance performance and reduce API request load.
+This project is a simple web application that displays weather information for predefined cities. It leverages OpenWeatherMap's API to fetch weather data and presents it in a user-friendly web interface. The application includes a PHP proxy backend to securely handle API requests without exposing the API key on the client side. It also features a basic caching mechanism to enhance performance and reduce API request load.
+
+<img src="https://raw.githubusercontent.com/cprima/simple-weather-cards/docs/images/architecture-diagram.svg"  alt="Desert Cities"/>
 
 <table>
   <tr>
@@ -35,7 +37,6 @@ This project is a simple web application that displays weather information for p
   </tr>
 </table>
 
-
 ## Features
 
 - Displays weather information for a set of predefined cities.
@@ -55,28 +56,28 @@ Follow these steps to set up the weather display application on your server:
 
 1. **Clone the Repository**: First, clone this repository to your web server's document root or a subdirectory. You can use the following command, replacing `your-repo.git` with the actual repository URL:
 
-    ```
-    git clone https://example.com/your-repo.git
-    ```
+   ```
+   git clone https://example.com/your-repo.git
+   ```
 
 2. **Set Up Environment Variables**:
-   
-    a. Create a `.env` file in the root directory of your project (the same location as your `openweathermap_proxy.php` file).
-    
-    b. Add the following line to the `.env` file, replacing `YOUR_API_KEY_HERE` with your actual OpenWeatherMap API key:
-    
-       ```
-       OPENWEATHERMAP_APIKEY=YOUR_API_KEY_HERE
-       ```
-    
-    c. Ensure the `.env` file is properly secured and not accessible from the web. If your web server uses Apache, you might already have an `.htaccess` file in place that denies access to dotfiles. If not, consider adding the following to your `.htaccess` file:
-    
-       ```apache
-       <Files .env>
-           Order allow,deny
-           Deny from all
-       </Files>
-       ```
+
+   a. Create a `.env` file in the root directory of your project (the same location as your `openweathermap_proxy.php` file).
+
+   b. Add the following line to the `.env` file, replacing `YOUR_API_KEY_HERE` with your actual OpenWeatherMap API key:
+
+   ```
+   OPENWEATHERMAP_APIKEY=YOUR_API_KEY_HERE
+   ```
+
+   c. Ensure the `.env` file is properly secured and not accessible from the web. If your web server uses Apache, you might already have an `.htaccess` file in place that denies access to dotfiles. If not, consider adding the following to your `.htaccess` file:
+
+   ```apache
+   <Files .env>
+       Order allow,deny
+       Deny from all
+   </Files>
+   ```
 
 3. **Configure Web Server**: No special configuration beyond standard PHP support is typically required. However, ensure your web server is configured to serve the directory where you've placed the project files.
 
@@ -89,5 +90,3 @@ Contributions to improve the application are welcome. Please feel free to fork t
 ## License
 
 @see: [LICENCE](LICENCE.md) and [AUTHORS](AUTHORS.md).
-
-

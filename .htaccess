@@ -7,4 +7,5 @@ RewriteCond %{REQUEST_FILENAME} !-f
 
 # Adjust the RewriteRule to include the /weather subdirectory in the pattern
 RewriteRule ^weather/api/v1/admin/(.*)$ /weather/backend.php?route=admin_$1&version=v1 [QSA,L]
-RewriteRule ^weather/api/v1/(.*)$ /weather/backend.php?route=$1&version=v1 [QSA,L]
+RewriteRule ^weather/api/(v[1234](\.[1])?)/(.*)$ /weather/backend.php?route=$3&version=$1 [QSA,L]
+

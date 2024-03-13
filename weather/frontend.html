@@ -103,7 +103,7 @@
       const params = getUrlParams();
       updateStyleProperties(params);
 
-      const apiUrl = `/weather/openweathermap_proxy.php?ids=${params.cities}`;
+      const apiUrl = `/weather/api/v1/current?citiesId=${params.cities}`;
 
       app.classList.add('fade-out');
       setTimeout(() => {

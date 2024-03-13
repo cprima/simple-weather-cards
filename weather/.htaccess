@@ -1,4 +1,4 @@
-DirectoryIndex cards.html
+DirectoryIndex frontend.html
 
 <Files .env>
     Order allow,deny
