@@ -17,183 +17,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Weather Display</title>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-  <style>
-    :root {
-      --primary-color: #cb4b16;
-      --secondary-color: #eee8d5;
-      --header-height: 4px;
-      --footer-height: 60px;
-      --main-content-padding-top: 20px;
-      --footer-link-color: #CCCCCC;
-    }
-
-    body,
-    html {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
-      font-family: Arial, sans-serif;
-      background-color: var(--secondary-color);
-    }
-
-    header {
-      width: 100%;
-      height: var(--header-height);
-      background-color: var(--primary-color);
-    }
-
-    .main-content {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      padding-top: var(--main-content-padding-top);
-    }
-
-    .container {
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 20px;
-    }
-
-    footer#site-footer {
-      width: 100%;
-      height: var(--footer-height);
-      background-color: var(--secondary-color);
-      z-index: 99;
-    }
-
-    .footer-content {
-      color: var(--footer-link-color);
-      display: flex;
-      justify-content: space-evenly;
-      align-items: center;
-      height: 100%;
-    }
-
-    .footer-link {
-      color: var(--footer-link-color);
-      text-decoration: none;
-    }
-
-    div#weathercards {
-      z-index: 2;
-    }
-
-    .weather-card {
-      display: flex;
-      flex-direction: column;
-      min-width: 250px;
-      max-width: 300px;
-      background-color: var(--secondary-color);
-      border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      overflow: hidden;
-    }
-
-    .weather-card .header {
-      padding: 15px;
-      padding-bottom: 5px;
-      background-color: var(--primary-color);
-      color: var(--secondary-color);
-      text-align: center;
-    }
-
-    .weather-card .main {
-      color: var(--primary-color);
-      padding: 15px;
-    }
-
-    .weather-card .main .item {
-      display: flex;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .weather-card .main .item .visualization {
-      margin-right: 8px;
-    }
-
-    .weather-card .main .item .visualization i {
-      margin-right: 8px;
-      opacity: 0.3;
-    }
-
-    .weather-card .main .item .text {
-      display: flex;
-      align-items: center;
-      /* Vertically aligns text with the icon */
-      flex-grow: 1;
-      /* Allows text container to fill the available space */
-    }
-
-    .weather-card .main .item .text .label {
-      opacity: 0.7;
-    }
-
-    .weather-card .main .item .text .data {
-      margin-left: auto;
-    }
-
-    #world-map {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      z-index: 1;
-      fill: var(--primary-color);
-      opacity: 0.05;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0.1;
-      }
-
-      to {
-        opacity: 1;
-      }
-    }
-
-    .weather-card {
-      animation-name: fadeIn;
-      animation-duration: 2s;
-      /* animation-delay will be set in JavaScript */
-      animation-fill-mode: forwards;
-      opacity: 0;
-      /*transform-origin: top;*/
-      /*overflow: hidden;*/
-      /* Prevent content from overflowing during animation */
-    }
-
-    @keyframes rollUp {
-      0% {
-        opacity: 1;
-        transform: scaleY(1);
-      }
-
-      100% {
-        opacity: 0;
-        transform: scaleY(0);
-      }
-    }
-
-    @keyframes fadeOut {
-      from {
-        opacity: 1;
-      }
-
-      to {
-        opacity: 0;
-      }
-    }
-
-    .fade-out {
-      animation: fadeOut 0.5s forwards;
-    }
-  </style>
+  <link rel="stylesheet" href="assets/css/style.css">
 </head>
 
 <body>
@@ -240,71 +64,66 @@
       setInterval(loadWeatherCards, refreshInterval);
     });
 
-    function loadWeatherCards() {
-      const app = document.getElementById('weathercards');
+    // Function to extract and return URL parameters
+    function getUrlParams() {
       const queryString = window.location.search;
       const urlParams = new URLSearchParams(queryString);
+      return {
+        cities: urlParams.get('cities') || '2857458,2806654,2866375,616530,617026,611717',
+        primaryColor: `#${urlParams.get('primaryColor') || 'cb4b16'}`,
+        secondaryColor: `#${urlParams.get('secondaryColor') || 'eee8d5'}`,
+        padTop: `${urlParams.get('padTop') || '20px'}`,
+      };
+    }
 
-      // locations to show
-      let cities = '2857458,2806654,2866375,616530,617026,611717';
-      if (urlParams.has('cities')) {
-        cities = urlParams.get('cities');
-      }
-
-      // colors
-      let primaryColor = `#${urlParams.get('primaryColor') || 'cb4b16'}`; // Default to Solarized orange if not specified
-      let secondaryColor = `#${urlParams.get('secondaryColor') || 'eee8d5'}`; // Default to Solarized base2 if not specified
+    // Function to update CSS custom properties based on URL parameters
+    function updateStyleProperties({ primaryColor, secondaryColor, padTop }) {
       const footerLinkColor = mixWithBlack(secondaryColor.slice(1), 4);
-      let padTop = `${urlParams.get('padTop') || '20px'}`;
       document.documentElement.style.setProperty('--primary-color', primaryColor);
       document.documentElement.style.setProperty('--secondary-color', secondaryColor);
       document.documentElement.style.setProperty('--footer-link-color', footerLinkColor);
       document.documentElement.style.setProperty('--main-content-padding-top', padTop);
+    }
 
-      // pointing to local proxy script
-      const apiUrl = `/weather/openweathermap_proxy.php?ids=${cities}`;
+    // Function to handle the fetch response
+    function handleFetchResponse(response) {
+      const cacheState = response.headers.get('X-Cache');
+      let cacheAge = response.headers.get('X-Cache-Age') || 'Unavailable';
+      cacheAge = cacheAge === 'Unavailable' ? cacheAge : `Age ${cacheAge} seconds`;
+
+      const cacheAgeSpan = document.getElementById('cache-age');
+      cacheAgeSpan.textContent = `Cache: ${cacheAge}`;
+
+      return response.json();
+    }
+
+    // Main function to load weather cards
+    function loadWeatherCards() {
+      const app = document.getElementById('weathercards');
+      const params = getUrlParams();
+      updateStyleProperties(params);
+
+      const apiUrl = `/weather/openweathermap_proxy.php?ids=${params.cities}`;
 
       app.classList.add('fade-out');
       setTimeout(() => {
         app.classList.remove('fade-out');
         app.innerHTML = '';
-
         fetch(apiUrl)
-          .then(response => {
-            // Access custom headers
-            const cacheState = response.headers.get('X-Cache');
-            let cacheAge = response.headers.get('X-Cache-Age');
-            console.log(`Cache State: ${cacheState}, Cache Age: ${cacheAge} seconds`);
-            // Handle an unset 'X-Cache-Age'
-            if (cacheAge === null) {
-              cacheAge = 'Unavailable'; // or any default/fallback message you prefer
-            } else {
-              cacheAge = 'Age ' + cacheAge + ' seconds'; // Append 'seconds' only if the cache age is available
-            }
-
-            // Update the cache age display
-            const cacheAgeSpan = document.getElementById('cache-age');
-            cacheAgeSpan.textContent = `Cache: ${cacheAge}`;
-
-            if (!response.ok) {
-              throw new Error('Network response was not ok');
-            }
-            return response.json();
-          })
+          .then(handleFetchResponse)
           .then(data => {
             if (data.error) {
               console.error('Error fetching weather data:', data.details);
-              // Handle error in UI, e.g., show an error message
             } else {
               data.list.forEach((weatherData, index) => {
-                const card = createWeatherCard(weatherData, index); // Capture the returned card
-                app.appendChild(card); // Append the card to the 'app' container
+                const card = createWeatherCard(weatherData, index);
+                app.appendChild(card);
               });
             }
           })
           .catch(error => console.error("Error fetching weather data:", error));
-      }, 500); // This delay should match the duration of the fade-out animation
-    };
+      }, 500); // Delay to match fade-out animation
+    }
 
     function createWeatherCard(openweatherdata, index) {
 
@@ -465,22 +284,22 @@
     function calculateLocalTimeFromTimestamp(unixTimestamp, timezoneOffset) {
       // Convert the Unix timestamp to milliseconds and create a Date object
       const specifiedTime = new Date(unixTimestamp * 1000);
-    
+
       // Calculate the local time taking into account the timezoneOffset
       // This creates a new Date object adjusted for the timezone offset
       const localTime = new Date(specifiedTime.getTime() + timezoneOffset * 1000);
-    
+
       // Format the hour and minute, ensuring hours are correctly adjusted for midnight
       let hours = localTime.getUTCHours(); // Use getUTCHours to ignore the local timezone of the JS environment
       let minutes = localTime.getUTCMinutes(); // Use getUTCMinutes for consistency
-    
+
       // Ensure hours and minutes are two digits
       const formattedHours = hours.toString().padStart(2, '0');
       const formattedMinutes = minutes.toString().padStart(2, '0');
-    
+
       return `${formattedHours}:${formattedMinutes}`;
     }
-    
+
 
     function convertSecondsToFractionalHours(seconds) {
       // Convert seconds to hours as a decimal
@@ -518,22 +337,22 @@
     function calculateSolarNoon(openWeatherData) {
       // Extract sunrise and sunset times from the provided data
       const { sunrise, sunset } = openWeatherData.sys;
-  
+
       // Calculate the midpoint between sunrise and sunset
       const solarNoonTimestamp = sunrise + ((sunset - sunrise) / 2);
-  
-      return solarNoonTimestamp;
-  }
 
-  function roundHumidity(humidity) {
-    if (humidity <= 95) {
+      return solarNoonTimestamp;
+    }
+
+    function roundHumidity(humidity) {
+      if (humidity <= 95) {
         // Round to the nearest multiple of 5
         return Math.round(humidity / 5) * 5;
-    } else {
+      } else {
         // Round to the nearest full number if above 95
         return Math.round(humidity);
+      }
     }
-}
 
   </script>
 

@@ -3,8 +3,13 @@
 
 # But not these directories and files
 !/.gitignore
+!/.htaccess
+!/weather/
+!/weather/*
 !/weather/**
 !/README.md
 !/LICENCE.md
 !/AUTHORS.md
 
+# Ignore again these development / R&D files
+*log*

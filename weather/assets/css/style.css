@@ -1,0 +1,175 @@
+:root {
+    --primary-color: #cb4b16;
+    --secondary-color: #eee8d5;
+    --header-height: 4px;
+    --footer-height: 60px;
+    --main-content-padding-top: 20px;
+    --footer-link-color: #CCCCCC;
+  }
+
+  body,
+  html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    font-family: Arial, sans-serif;
+    background-color: var(--secondary-color);
+  }
+
+  header {
+    width: 100%;
+    height: var(--header-height);
+    background-color: var(--primary-color);
+  }
+
+  .main-content {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-top: var(--main-content-padding-top);
+  }
+
+  .container {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+  }
+
+  footer#site-footer {
+    width: 100%;
+    height: var(--footer-height);
+    background-color: var(--secondary-color);
+    z-index: 99;
+  }
+
+  .footer-content {
+    color: var(--footer-link-color);
+    display: flex;
+    justify-content: space-evenly;
+    align-items: center;
+    height: 100%;
+  }
+
+  .footer-link {
+    color: var(--footer-link-color);
+    text-decoration: none;
+  }
+
+  div#weathercards {
+    z-index: 2;
+  }
+
+  .weather-card {
+    display: flex;
+    flex-direction: column;
+    min-width: 250px;
+    max-width: 300px;
+    background-color: var(--secondary-color);
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+  }
+
+  .weather-card .header {
+    padding: 15px;
+    padding-bottom: 5px;
+    background-color: var(--primary-color);
+    color: var(--secondary-color);
+    text-align: center;
+  }
+
+  .weather-card .main {
+    color: var(--primary-color);
+    padding: 15px;
+  }
+
+  .weather-card .main .item {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .weather-card .main .item .visualization {
+    margin-right: 8px;
+  }
+
+  .weather-card .main .item .visualization i {
+    margin-right: 8px;
+    opacity: 0.3;
+  }
+
+  .weather-card .main .item .text {
+    display: flex;
+    align-items: center;
+    /* Vertically aligns text with the icon */
+    flex-grow: 1;
+    /* Allows text container to fill the available space */
+  }
+
+  .weather-card .main .item .text .label {
+    opacity: 0.7;
+  }
+
+  .weather-card .main .item .text .data {
+    margin-left: auto;
+  }
+
+  #world-map {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1;
+    fill: var(--primary-color);
+    opacity: 0.05;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0.1;
+    }
+
+    to {
+      opacity: 1;
+    }
+  }
+
+  .weather-card {
+    animation-name: fadeIn;
+    animation-duration: 2s;
+    /* animation-delay will be set in JavaScript */
+    animation-fill-mode: forwards;
+    opacity: 0;
+    /*transform-origin: top;*/
+    /*overflow: hidden;*/
+    /* Prevent content from overflowing during animation */
+  }
+
+  @keyframes rollUp {
+    0% {
+      opacity: 1;
+      transform: scaleY(1);
+    }
+
+    100% {
+      opacity: 0;
+      transform: scaleY(0);
+    }
+  }
+
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+    }
+
+    to {
+      opacity: 0;
+    }
+  }
+
+  .fade-out {
+    animation: fadeOut 0.5s forwards;
+  }
