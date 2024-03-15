@@ -58,11 +58,63 @@
     document.addEventListener("DOMContentLoaded", () => {
       // Initial load of weather cards
       loadWeatherCards();
-
+v2LoadWeatherCards();
       // Refresh the weather cards every x minutes in milliseconds
       const refreshInterval = 1 * 60 * 1000;
       setInterval(loadWeatherCards, refreshInterval);
     });
+
+    // Main function to load weather cards
+    function loadWeatherCards() {
+      const app = document.getElementById('weathercards');
+      const params = getUrlParams();
+      updateStyleProperties(params);
+
+      const apiUrl = `/weather/api/v1/current?citiesId=${params.cities}`;
+
+      app.classList.add('fade-out');
+      setTimeout(() => {
+        app.classList.remove('fade-out');
+        app.innerHTML = '';
+        fetch(apiUrl)
+          .then(handleFetchResponse)
+          .then(data => {
+            if (data.error) {
+              console.error('Error fetching weather data:', data.details);
+            } else {
+              data.list.forEach((weatherData, index) => {
+                const card = createWeatherCard(weatherData, index);
+                app.appendChild(card);
+              });
+            }
+          })
+          .catch(error => console.error("Error fetching weather data:", error));
+      }, 500); // Delay to match fade-out animation
+    }
+
+function v2LoadWeatherCards() {
+  const params = new URLSearchParams(window.location.search);
+  const cities = params.get('cities') ? params.get('cities').split(',') : [];
+
+  cities.forEach(cityId => {
+    const currentWeatherUrl = `https://cpr.in-berlin.de/weather/api/v1.9/current?cityId=${cityId}`;
+    const forecastUrl = `https://cpr.in-berlin.de/weather/api/v1.9/forecast?cityId=${cityId}`;
+
+    // Fetch current weather data
+    fetch(currentWeatherUrl)
+      .then(response => response.json())
+      .then(data => console.log(`Current weather data for cityId ${cityId}:`, data))
+      .catch(error => console.error(`Error fetching current weather for cityId ${cityId}:`, error));
+
+    // Fetch forecast data
+    fetch(forecastUrl)
+      .then(response => response.json())
+      .then(data => console.log(`Forecast data for cityId ${cityId}:`, data))
+      .catch(error => console.error(`Error fetching forecast for cityId ${cityId}:`, error));
+  });
+}
+
+
 
     // Function to extract and return URL parameters
     function getUrlParams() {
@@ -95,34 +147,6 @@
       cacheAgeSpan.textContent = `Cache: ${cacheAge}`;
 
       return response.json();
-    }
-
-    // Main function to load weather cards
-    function loadWeatherCards() {
-      const app = document.getElementById('weathercards');
-      const params = getUrlParams();
-      updateStyleProperties(params);
-
-      const apiUrl = `/weather/api/v1/current?citiesId=${params.cities}`;
-
-      app.classList.add('fade-out');
-      setTimeout(() => {
-        app.classList.remove('fade-out');
-        app.innerHTML = '';
-        fetch(apiUrl)
-          .then(handleFetchResponse)
-          .then(data => {
-            if (data.error) {
-              console.error('Error fetching weather data:', data.details);
-            } else {
-              data.list.forEach((weatherData, index) => {
-                const card = createWeatherCard(weatherData, index);
-                app.appendChild(card);
-              });
-            }
-          })
-          .catch(error => console.error("Error fetching weather data:", error));
-      }, 500); // Delay to match fade-out animation
     }
 
     function createWeatherCard(openweatherdata, index) {

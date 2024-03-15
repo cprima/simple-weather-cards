@@ -1,11 +1,40 @@
 <?php
 
+//-------------------------------------
+//          Initialization
+//-------------------------------------
+#region initialization
+
+// Temporarily set the PHP environment to use UTC
+$defaultTimezone = date_default_timezone_get();
+date_default_timezone_set('UTC');
+
+// Make sure the logs directory exists and is writable
+if (!is_dir(__DIR__ . '/logs')) {
+    mkdir(__DIR__ . '/logs', 0755, true);
+}
+
+// Set the PHP error log to a file in the logs directory
+ini_set('log_errors', '1');
+ini_set('error_log', __DIR__ . '/logs/php_errors.log');
+
+
 $route = isset($_GET['route']) ? $_GET['route'] : '';
 $version = isset($_GET['version']) ? $_GET['version'] : '';
 
-// Global settings
-$cacheLifetime = 302; // Cache lifetime in seconds
-$cacheDirectory = __DIR__ . '/cache/'; // Cache directory
+$cityId = filter_input(INPUT_GET, 'cityId', FILTER_VALIDATE_INT);
+if ($cityId === false) {
+    // Handle invalid cityId
+    echo json_encode(['error' => 'Invalid city ID. Please provide a valid integer.']);
+    exit;
+}
+#endregion initialization
+
+
+//-------------------------------------
+//          Configuration
+//-------------------------------------
+#region configuration
 
 $envFilePath = '.env';
 if (file_exists($envFilePath)) {
@@ -16,15 +45,25 @@ if (file_exists($envFilePath)) {
     exit;
 }
 
+define('CACHE_LIFETIME', 602); // Cache lifetime in seconds
+define('CACHE_DIRECTORY', __DIR__ . '/cache/');
+
 define('OPENWEATHERMAP_API_KEY', $dotenv["OPENWEATHERMAP_APIKEY"]);
 define('OPENWEATHERMAP_BASE_URL', 'http://api.openweathermap.org/data/2.5/');
 
+define('DAYS_BEFORE_WEEKEND', 4);
+define('WEEKEND_DAY_START_HOUR', 8);
+define('WEEKEND_DAY_END_HOUR', 20);
+define('WEEKEND_START_HOUR', 18);
+define('WEEKEND_END_HOUR', 21);
 
-// // OpenAPI/Swagger specification
-// $specFilePath = __DIR__ . '/openapi_spec_v1.json';
-// $swaggerSpec = json_decode(file_get_contents($specFilePath), true);
+#endregion configuration
 
-// Simple router based on route and version query parameters
+
+//-------------------------------------
+//          Router
+//-------------------------------------
+#region simplerouter
 if ($version === 'v1') {
     switch ($route) {
         case 'spec':
@@ -47,30 +86,43 @@ if ($version === 'v1') {
             echo json_encode(['error' => 'Route not found']);
             break;
     }
-} elseif ($version === 'v1.1') {
+} elseif ($version === 'v0.9') {
+    switch ($route) {
+        case 'spec':
+            handleSpec($version);
+            break;
+
+        default:
+            // Handle 404 Not Found for unknown routes
+            header('HTTP/1.1 404 Not Found');
+            echo json_encode(['error' => 'Route not found']);
+            break;
+    }
+} elseif ($version === 'v1.9') {
     switch ($route) {
         case 'spec':
             handleSpec($version);
             break;
 
         case 'current':
-            $cityId = $_GET['cityId'] ?? 'unknown';
-            handleCurrentWeather($cityId);
+            v2HandleCurrentWeather($cityId, 'weather');
             break;  
 
         case 'forecast':
             // Assuming cityId is passed as a query parameter
-            $cityId = $_GET['cityId'] ?? 'unknown';
-            handleForecast($cityId);
-            break;
-
-        case 'health':
-            handleHealthCheck();
+            v2HandleForecast($cityId);
             break;
 
         case 'admin_clear-cache':
             // Ensure this endpoint is protected by authentication or similar
             handleClearCache();
+            break;
+
+        case 'preview':
+            $result = v2FetchWeatherData($cityId, 'weather');
+            //echo json_encode(['debug' => $result]);
+            $result2 = generateWeekendForecast($cityId, $result['timezone']);
+            echo json_encode(['forecast' => $result2]);
             break;
 
         default:
@@ -84,7 +136,26 @@ if ($version === 'v1') {
     header('HTTP/1.1 404 Not Found');
     echo json_encode(['error' => 'API version not supported']);
 }
+#endregion simplerouter
 
+
+//-------------------------------------
+//          Handlers
+//-------------------------------------
+#region handlerfunctions
+/**
+ * Serves the OpenAPI specification for the API based on the requested version.
+ * This function looks for a JSON specification file matching the API version,
+ * sets the appropriate HTTP content type, and outputs the spec.
+ * If the spec file for the requested version is not found, it responds with a 404 Not Found status.
+ *
+ * Used By:
+ * - API v0.9
+ * - API v1
+ * - API v1.9
+ * 
+ * @param string $version The requested API version, used to locate the corresponding spec file.
+ */
 function handleSpec($version) {
     // Define the base path to your API specs
     $basePath = './assets/api_specs/';
@@ -109,7 +180,35 @@ function handleSpec($version) {
     }
 }
 
+/**
+ * 
+ * Used By:
+ * - API v1.9
+ */
+function v2HandleCurrentWeather($cityId) {
+    $data = v2FetchWeatherData($cityId, 'weather');
+    // Serve the response
+    header('Content-Type: application/json');
+    echo json_encode($data);
+}
 
+/**
+ * 
+ * Used By:
+ * - API v1.9
+ */
+function v2HandleForecast($cityId) {
+    $data = v2FetchWeatherData($cityId, 'forecast');
+    // Serve the response
+    header('Content-Type: application/json');
+    echo json_encode($data);
+}
+
+/**
+ * 
+ * Used By:
+ * - API v1
+ */
 function handleCurrentWeather($cityId, $endpoint='weather') {
     $key = "current_$cityId";
     $filePath = getCacheFilePath($key);
@@ -132,22 +231,105 @@ function handleCurrentWeather($cityId, $endpoint='weather') {
     }
 }
 
-
-function handleForecast($cityId) {
-    // Mock response for demonstration
-    header('Content-Type: application/json');
-    echo json_encode(["cityId" => $cityId, "forecast" => "Rainy tomorrow"]);
-}
-
+/**
+ * 
+ * Used By:
+ * - 
+ */
 function handleHealthCheck() {
     // Mock response for demonstration
     header('Content-Type: application/json');
     echo json_encode(["status" => "OK", "uptime" => "4711"]);
 }
+#endregion handlerfunctions
 
-///////////////////////////////////////
 
-// function to fetch current weather data
+//-------------------------------------
+//          Data Fetching
+//-------------------------------------
+#region fetching
+function v2FetchWeatherData($cityId, $endpoint) {
+    $key = "{$endpoint}_{$cityId}";
+    $filePath = getCacheFilePath($key);
+
+    // Check if cache is valid
+    if (isCacheValid($filePath)) {
+        // Serve from cache
+        $data = json_decode(file_get_contents($filePath), true);
+        // Calculate cache age
+        $cacheAge = time() - filemtime($filePath);
+        // Add cache headers
+        header('Content-Type: application/json');
+        header('X-Cache: HIT');
+        header("X-Cache-Age: $cacheAge");
+        // adding a flag to indicate this is from cache if necessary
+        $data['_fromCache'] = true;
+        return $data;
+    } else {
+        // Fetch new data
+        $params = ['id' => $cityId, 'units' => 'metric'];
+        $response = callOpenWeatherMapAPI($endpoint, $params);
+
+        // Check for error in response before caching
+        if (!isset($response['error'])) {
+            // Cache the new data
+            file_put_contents($filePath, json_encode($response));
+            // Add cache headers for fresh data
+            header('Content-Type: application/json');
+            header('X-Cache: MISS');
+            // Optionally, add a flag or modify the response to indicate fresh data
+            $response['_fromCache'] = false;
+        } else {
+            // Handle error, including adding relevant headers if necessary
+            header('Content-Type: application/json');
+            // Assuming error handling is done within the callOpenWeatherMapAPI function,
+            // and it sets appropriate HTTP status codes.
+        }
+        return $response;
+    }
+}
+
+function v2FetchForecastData($cityId, $endpoint='forecast') {
+    $key = "{$endpoint}_{$cityId}";
+    $filePath = getCacheFilePath($key);
+
+    // Check if cache is valid
+    if (isCacheValid($filePath)) {
+        // Serve from cache
+        $data = json_decode(file_get_contents($filePath), true);
+        // Calculate cache age
+        $cacheAge = time() - filemtime($filePath);
+        // Add cache headers
+        header('Content-Type: application/json');
+        header('X-Cache: HIT');
+        header("X-Cache-Age: $cacheAge");
+        // adding a flag to indicate this is from cache if necessary
+        $data['_fromCache'] = true;
+        return $data;
+    } else {
+        // Fetch new data
+        $params = ['id' => $cityId, 'units' => 'metric'];
+        $response = callOpenWeatherMapAPI($endpoint, $params);
+
+        // Check for error in response before caching
+        if (!isset($response['error'])) {
+            // Cache the new data
+            file_put_contents($filePath, json_encode($response));
+            // Add cache headers for fresh data
+            header('Content-Type: application/json');
+            header('X-Cache: MISS');
+            // Optionally, add a flag or modify the response to indicate fresh data
+            $response['_fromCache'] = false;
+        } else {
+            // Handle error, including adding relevant headers if necessary
+            header('Content-Type: application/json');
+            // Assuming error handling is done within the callOpenWeatherMapAPI function,
+            // and it sets appropriate HTTP status codes.
+        }
+        return $response;
+    }
+}
+
 function fetchCurrentWeatherData($cityId, $endpoint='weather') {
     // Specify the parameters for the API call
     $params = [
@@ -167,6 +349,35 @@ function fetchCurrentWeatherData($cityId, $endpoint='weather') {
         //     'description' => $response['weather'][0]['description'],
         //     'icon' => $response['weather'][0]['icon']
         // ];
+    } else {
+        // Return the error from the API call
+        return [
+            'error' => true,
+            'message' => $response['message'] ?? 'Unknown error occurred.',
+            'code' => $response['cod']
+        ];
+    }
+}
+
+/**
+ * 
+ * Used By:
+ * - 
+ */
+function fetchForecastData($cityId, $endpoint='forecast') {
+    // Specify the parameters for the API call
+    $params = [
+        'id' => $cityId,
+        'units' => 'metric' // Example parameter to get temperature in Celsius
+    ];
+
+    // Call the OpenWeatherMap API using the wrapper function
+    $response = callOpenWeatherMapAPI($endpoint, $params);
+
+    if (!isset($response['error'])) {
+        // Process the API response as needed for your application
+        return $response; // Directly return the full API response for maximum flexibility
+        // Optionally, you could process and return a structured response similar to the fetchCurrentWeatherData function if needed
     } else {
         // Return the error from the API call
         return [
@@ -221,20 +432,168 @@ function callOpenWeatherMapAPI($endpoint, array $params = []) {
         ];
     }
 }
+#endregion
 
-// Utility cache functions
+
+//-------------------------------------
+//          Data Processing
+//-------------------------------------
+#region processing
+function determineWeekendStatus($currentUnixTime, $timezoneOffset) {
+
+    // Calculate the current day and time in the local timezone
+    $localUnixTime = $currentUnixTime + $timezoneOffset;
+    $dayOfWeek = date('N', $localUnixTime); // 1 (for Monday) through 7 (for Sunday)
+    $hour = date('G', $localUnixTime); // Hour in 24-hour format without leading zeros
+
+    $upcomingWeekend = false;
+    $isWeekend = false;
+    $weekendTimeframe = ['begin' => null, 'end' => null];
+
+    if ($dayOfWeek >= 1 && $dayOfWeek <= 5 - DAYS_BEFORE_WEEKEND) {
+        // It's before the countdown to the weekend starts
+        $upcomingWeekend = false;
+        $isWeekend = false;
+    } elseif ($dayOfWeek < 5 || ($dayOfWeek == 5 && $hour < 18)) {
+        // It's within the countdown period to the weekend but before the weekend starts
+        $upcomingWeekend = true;
+        $isWeekend = false;
+    } elseif (($dayOfWeek == 5 && $hour >= WEEKEND_START_HOUR) || $dayOfWeek == 6 || ($dayOfWeek == 7 && $hour <= WEEKEND_END_HOUR)) {
+        // It's the weekend
+        $upcomingWeekend = false;
+        $isWeekend = true;
+    }
+
+    if ($upcomingWeekend || $isWeekend) {
+        // Calculate beginning of the weekend: Friday at 18:00 local time
+        $weekendBeginTime  = strtotime("this Friday " . WEEKEND_START_HOUR . ":00", $currentUnixTime) + $timezoneOffset - date('Z', $currentUnixTime);
+        // Calculate end of the weekend: Sunday at 21:00 local time
+        $weekendEndTime  = strtotime("this Sunday " . WEEKEND_END_HOUR . ":00", $currentUnixTime) + $timezoneOffset - date('Z', $currentUnixTime);
+
+        $weekendTimeframe = ['begin' => $weekendBeginTime , 'end' => $weekendEndTime ];
+    }
+
+    return [
+        'upcomingWeekend' => $upcomingWeekend,
+        'isWeekend' => $isWeekend,
+        'weekendTimeframe' => $weekendTimeframe
+    ];
+}
+
+function upcomingWeekendWeather($cityId) {
+    $forecastData = v2FetchForecastData($cityId, 'forecast');
+
+    $timezoneOffset = $forecastData['city']['timezone']; // Timezone offset in seconds
+
+    $currentUnixTime = time();
+    $weekendStatus = determineWeekendStatus($currentUnixTime, $timezoneOffset);
+
+    $result = ['openweatherdata' => [], 'forecast-weather' => []];
+
+    if ($weekendStatus['upcomingWeekend'] || $weekendStatus['isWeekend']) {
+        $weekendBegin = $weekendStatus['weekendTimeframe']['begin'];
+        $weekendEnd = $weekendStatus['weekendTimeframe']['end'];
+
+        foreach ($forecastData['list'] as $forecast) {
+            // Adjust forecast timestamp to UTC for accurate local hour calculation
+            $forecastLocalTime = $forecast['dt'] + $timezoneOffset;
+            // Now, 'date' functions as if in UTC, giving accurate local time conversion
+            $forecastHour = (int)date('G', $forecastLocalTime); // 'G' returns hours in 24-hour format without leading zeros
+
+            // Include debug information within each forecast data
+            $forecast['_debug'] = [
+                'dt' => $forecast['dt'],
+                'timezoneOffset' => $timezoneOffset,
+                'localHour' => $forecastHour,
+            ];
+
+            if ($forecast['dt'] >= $weekendBegin && $forecast['dt'] <= $weekendEnd && $forecastHour >= WEEKEND_DAY_START_HOUR && $forecastHour < WEEKEND_DAY_END_HOUR) {
+                // Collect forecast data and weather condition for aggregation
+                $result['openweatherdata'][] = $forecast;
+            }
+        }
+    }
+
+    return $result;
+}
+
+function aggregateWeekendWeather($forecastData) {
+    $temperatureMin = PHP_INT_MAX;
+    $temperatureMax = PHP_INT_MIN;
+    $weatherConditions = [];
+    $uniqueWeatherForecasts = [];
+
+    foreach ($forecastData['openweatherdata'] as $forecast) {
+        // Aggregate temperature data
+        $temperatureMin = min($temperatureMin, $forecast['main']['temp_min']);
+        $temperatureMax = max($temperatureMax, $forecast['main']['temp_max']);
+        
+        // Collect unique weather conditions
+        foreach ($forecast['weather'] as $weather) {
+            $condition = $weather['main'];
+            if (!in_array($condition, $weatherConditions)) {
+                $weatherConditions[] = $condition;
+            }
+        }
+    }
+
+    // Prepare unique weather forecasts summary
+    $uniqueWeatherForecasts = array_unique($weatherConditions);
+    sort($uniqueWeatherForecasts); // Optional, for a sorted list of conditions
+
+    // Prepare the aggregate data
+    $aggregateData = [
+        'temperatureRange' => sprintf("%.1f°C to %.1f°C", $temperatureMin, $temperatureMax),
+        'overallWeatherOutlook' => implode(", ", $uniqueWeatherForecasts),
+        'uniqueWeatherForecasts' => $uniqueWeatherForecasts
+    ];
+
+    return $aggregateData;
+}
+
+function generateWeekendForecast($cityId, $timezoneOffset) {
+    $unixtimeNow = time();    
+    $weekendStatus = determineWeekendStatus($unixtimeNow, $timezoneOffset);
+    
+    if (!$weekendStatus['upcomingWeekend'] && !$weekendStatus['isWeekend']) {
+        // It's not close to the weekend, so we might not need to proceed.
+        return ['message' => 'No weekend forecast available at this time.'];
+    }
+    
+    $forecastData = upcomingWeekendWeather($cityId);
+    if (isset($forecastData['error'])) {
+        // Handle errors, such as city not found or API issues.
+        return ['error' => true, 'message' => $forecastData['message']];
+    }
+    
+    // Aggregate weekend weather from the forecast data.
+    $aggregateData = aggregateWeekendWeather($forecastData);
+
+
+    // Return both raw and aggregated data for detailed analysis and simple overview.
+    return [
+        'debug' => $weekendStatus,
+        'openweatherdata' => $forecastData['openweatherdata'],
+        'aggregate' => $aggregateData
+    ];
+}
+#endregion processing
+
+
+//-------------------------------------
+//          Helpers
+//-------------------------------------
+#region helpers
 function getCacheFilePath($key) {
     // Utility function to get the cache file path
-    global $cacheDirectory;
-    return $cacheDirectory . 'weather_cache_backend_' . md5($key) . '.json';
+    return CACHE_DIRECTORY . 'weather_cache_backend_' . md5($key) . '.json';
 }
 
 function isCacheValid($filePath) {
     // Utility function to check if the cache is valid
-    global $cacheLifetime;
     if (!file_exists($filePath)) return false;
     $fileTime = filemtime($filePath);
-    return (time() - $fileTime) < $cacheLifetime;
+    return (time() - $fileTime) < CACHE_LIFETIME;
 }
 
 function serveFromCache($filePath) {
@@ -262,8 +621,7 @@ function serveData($data, $fromCache) {
 }
 
 function handleClearCache() {
-    global $cacheDirectory;
-    $files = glob($cacheDirectory . 'weather_cache_backend_*.json');
+    $files = glob(CACHE_DIRECTORY . 'weather_cache_backend_*.json');
     $deletedFiles = [];
 
     foreach ($files as $file) {
@@ -280,11 +638,19 @@ function handleClearCache() {
     header('Content-Type: application/json');
     echo json_encode([
         'message' => 'Cache cleared successfully.',
-        'cacheDirectory' => $cacheDirectory,
+        'cacheDirectory' => CACHE_DIRECTORY,
         'cacheFiles' => $files,
         'deletedFiles' => $deletedFiles,
         'deleteCount' => $deleteCount
     ]);
     exit;
 }
+#endregion helpers
 
+
+//-------------------------------------
+//          Teardown
+//-------------------------------------
+
+// Restore the original default timezone
+date_default_timezone_set($defaultTimezone);

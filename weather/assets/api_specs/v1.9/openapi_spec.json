@@ -1,0 +1,322 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Weather API",
+    "description": "API for fetching current weather and forecast data by city ID.",
+    "version": "1.9"
+  },
+  "servers": [
+    {
+      "url": "https://cpr.in-berlin.de/weather/api/v1.9"
+    }
+  ],
+  "paths": {
+    "/current": {
+      "get": {
+        "summary": "Get current weather",
+        "description": "Fetches the current weather for the specified city ID.",
+        "parameters": [
+          {
+            "name": "cityId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Unique city identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with current weather data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CurrentWeatherResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "City not found"
+          }
+        }
+      }
+    },
+    "/forecast": {
+      "get": {
+        "summary": "Get weather forecast",
+        "description": "Fetches the weather forecast for the specified city ID.",
+        "parameters": [
+          {
+            "name": "cityId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Unique city identifier"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response with weather forecast data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForecastResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "City not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CurrentWeatherResponse": {
+        "type": "object",
+        "properties": {
+          "coord": {
+            "type": "object",
+            "properties": {
+              "lon": {
+                "type": "number",
+                "format": "float"
+              },
+              "lat": {
+                "type": "number",
+                "format": "float"
+              }
+            }
+          },
+          "weather": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Weather"
+            }
+          },
+          "main": {
+            "$ref": "#/components/schemas/Main"
+          },
+          "visibility": {
+            "type": "integer"
+          },
+          "wind": {
+            "$ref": "#/components/schemas/Wind"
+          },
+          "clouds": {
+            "$ref": "#/components/schemas/Clouds"
+          },
+          "dt": {
+            "type": "integer"
+          },
+          "sys": {
+            "$ref": "#/components/schemas/Sys"
+          },
+          "timezone": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cod": {
+            "type": "integer"
+          }
+        }
+      },
+      "ForecastResponse": {
+        "type": "object",
+        "properties": {
+          "cod": {
+            "type": "string"
+          },
+          "message": {
+            "type": "number"
+          },
+          "cnt": {
+            "type": "integer"
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForecastItem"
+            }
+          },
+          "city": {
+            "$ref": "#/components/schemas/City"
+          }
+        }
+      },
+      "Weather": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "main": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          }
+        }
+      },
+      "Main": {
+        "type": "object",
+        "properties": {
+          "temp": {
+            "type": "number"
+          },
+          "feels_like": {
+            "type": "number"
+          },
+          "temp_min": {
+            "type": "number"
+          },
+          "temp_max": {
+            "type": "number"
+          },
+          "pressure": {
+            "type": "integer"
+          },
+          "humidity": {
+            "type": "integer"
+          }
+        }
+      },
+      "Wind": {
+        "type": "object",
+        "properties": {
+          "speed": {
+            "type": "number"
+          },
+          "deg": {
+            "type": "integer"
+          }
+        }
+      },
+      "Clouds": {
+        "type": "object",
+        "properties": {
+          "all": {
+            "type": "integer"
+          }
+        }
+      },
+      "Sys": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "integer"
+          },
+          "id": {
+            "type": "integer"
+          },
+          "country": {
+            "type": "string"
+          },
+          "sunrise": {
+            "type": "integer"
+          },
+          "sunset": {
+            "type": "integer"
+          }
+        }
+      },
+      "ForecastItem": {
+        "type": "object",
+        "properties": {
+          "dt": {
+            "type": "integer"
+          },
+          "main": {
+            "$ref": "#/components/schemas/Main"
+          },
+          "weather": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Weather"
+            }
+          },
+          "clouds": {
+            "$ref": "#/components/schemas/Clouds"
+          },
+          "wind": {
+            "$ref": "#/components/schemas/Wind"
+          },
+          "visibility": {
+            "type": "integer"
+          },
+          "pop": {
+            "type": "number"
+          },
+          "sys": {
+            "type": "object",
+            "properties": {
+              "pod": {
+                "type": "string"
+              }
+            }
+          },
+          "dt_txt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "City": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "coord": {
+            "$ref": "#/components/schemas/Coordinates"
+          },
+          "country": {
+            "type": "string"
+          },
+          "population": {
+            "type": "integer"
+          },
+          "timezone": {
+            "type": "integer"
+          },
+          "sunrise": {
+            "type": "integer"
+          },
+          "sunset": {
+            "type": "integer"
+          }
+        }
+      },
+      "Coordinates": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "format": "float"
+          },
+          "lon": {
+            "type": "number",
+            "format": "float"
+          }
+        }
+      }
+    }
+  }
+}
