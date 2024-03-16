@@ -24,6 +24,17 @@ ini_set('error_log', __DIR__ . '/logs/php_errors.log');
 $route = isset($_GET['route']) ? $_GET['route'] : '';
 $version = isset($_GET['version']) ? $_GET['version'] : '';
 
+// Determine the requested response format
+$acceptHeader = $_SERVER['HTTP_ACCEPT'] ?? 'application/json'; // Default to JSON if no Accept header is present
+$responseFormat = 'json'; // Default response format
+
+if (strpos($acceptHeader, 'text/html____________________________________________') !== false) { //todo
+    $responseFormat = 'html';
+} elseif (strpos($acceptHeader, 'application/json') !== false) {
+    $responseFormat = 'json';
+}
+
+
 $cityId = filter_input(INPUT_GET, 'cityId', FILTER_VALIDATE_INT);
 if ($cityId === false) {
     // Handle invalid cityId
@@ -60,8 +71,18 @@ define('OPENROUTERAI_MODEL', 'anthropic/claude-3-haiku:beta');
 define('DAYS_BEFORE_WEEKEND', 4);
 define('WEEKEND_DAY_START_HOUR', 8);
 define('WEEKEND_DAY_END_HOUR', 19);
-define('WEEKEND_START_HOUR', 18);
-define('WEEKEND_END_HOUR', 21);
+//define('WEEKEND_START_HOUR', 18);
+//define('WEEKEND_END_HOUR', 19);
+
+
+define('WEEKEND_COUNTDOWN_START_DAY', 'Wednesday'); // Assuming the countdown starts on Wednesday
+define('WEEKEND_START_DAY', 'Friday');
+define('WEEKEND_START_HOUR', 18); // 6 PM, marking the start of weekend evening
+define('WEEKEND_END_DAY', 'Sunday');
+define('WEEKEND_END_HOUR', 21); // 9 PM, marking the end of the weekend's evening
+define('DAYTIME_START_HOUR', 8); // 8 AM
+define('DAYTIME_END_HOUR', 19); // 7 PM
+
 
 #endregion configuration
 
@@ -69,6 +90,7 @@ define('WEEKEND_END_HOUR', 21);
 //-------------------------------------
 //          Router
 //-------------------------------------
+// map route to handler functions
 #region simplerouter
 if ($version === 'v1') {
     switch ($route) {
@@ -111,7 +133,7 @@ if ($version === 'v1') {
             break;
 
         case 'current':
-            v2HandleCurrentWeather($cityId, 'weather');
+            v2HandleCurrentWeather($cityId, $responseFormat);
             break;  
 
         case 'forecast':
@@ -129,10 +151,21 @@ if ($version === 'v1') {
             break;
 
         case 'preview':
+            v2HandleCurrentWeather($cityId, $responseFormat);
+            break;
+
+        case 'preview2':
+            //v2CalculateWeekendBoundaries
             $result = v2FetchWeatherData($cityId, 'weather');
-            //echo json_encode(['debug' => $result]);
-            $result2 = generateWeekendForecast($cityId, $result['timezone']);
-            echo json_encode(['debug' => $result2['aggregate'], 'forecast' => $result2]);
+            $weatherResponse = new OpenWeatherMap\v2_5\WeatherResponse($result);
+            $locationCharacteristics = transformExternalToInternalData($weatherResponse);
+
+            //$result2 = v2FetchWeatherData($cityId, 'forecast');
+            //$forecastResponse = new OpenWeatherMap\v2_5\ForecastResponse($result2);
+
+            $result3 = v2UpcomingWeekendWeather($cityId, $locationCharacteristics->weekend->begin, $locationCharacteristics->weekend->end);
+            //$result2 = v2UpcomingWeekendWeather($cityId, 1711130400, 1711312790);
+            echo json_encode(['begin' => $locationCharacteristics->weekend->begin, 'end' => $locationCharacteristics->weekend->end, 'weekend' => $result3, 'locationCharacteristics' => $locationCharacteristics]);
             break;
 
         default:
@@ -152,6 +185,8 @@ if ($version === 'v1') {
 //-------------------------------------
 //          Handlers
 //-------------------------------------
+// call fetchers, process, end with setting HTTP header Content-Type and echo json encoded payload
+// todo: unified response structure incl error
 #region handlerfunctions
 /**
  * Serves the OpenAPI specification for the API based on the requested version.
@@ -195,12 +230,15 @@ function handleSpec($version) {
  * Used By:
  * - API v1.9
  */
-function v2HandleCurrentWeather($cityId) {
-    $currentWeatherData = v2FetchWeatherData($cityId, 'weather');
-    $weatherResponse = new OpenWeatherMap\v2_5\WeatherResponse($currentWeatherData);
-    // Serve the response
-    header('Content-Type: application/json');
-    echo json_encode($currentWeatherData);
+function v2HandleCurrentWeather($cityId, $format = 'json') {
+
+    $result = v2FetchWeatherData($cityId, 'weather');
+    $weatherResponse = new OpenWeatherMap\v2_5\WeatherResponse($result);
+    $locationCharacteristics = transformExternalToInternalData($weatherResponse);
+
+    $response = generateSuccessResponse($locationCharacteristics, null, $format);
+    sendResponse($response);
+
 }
 
 /**
@@ -208,11 +246,11 @@ function v2HandleCurrentWeather($cityId) {
  * Used By:
  * - API v1.9
  */
-function v2HandleForecast($cityId) {
+function v2HandleForecast($cityId, $format = 'json') {
     $data = v2FetchWeatherData($cityId, 'forecast');
-    // Serve the response
-    header('Content-Type: application/json');
-    echo json_encode($data);
+
+    $response = generateSuccessResponse($data, null, $format);
+    sendResponse($response);
 }
 
 /**
@@ -262,17 +300,14 @@ function v2HandleWeekendActivities($cityId) {
     
     $result1 = v2FetchWeatherData($cityId, 'weather');
     $result2 = generateWeekendForecast($cityId, $result1['timezone']);
-    if (isset($result2['aggregate'])) {
-      $forecastMain = implode(', ', $result2['aggregate']['uniqueWeatherMains']);
-      $forecastDescription = implode(', ', $result2['aggregate']['uniqueWeatherDescriptions']);
-      $result = fetchWeekendActivitiesSuggestions($result1['name'], $result2['aggregate']['uniqueWeatherDescriptions']);
-      $activities = $result['choices'][0]['message']['content'];
-    } else {
-        $activities = NULL;
-        $forecastDescription = NULL;
-        $forecastMain = NULL;
-    }
-    echo json_encode(['activities' => $activities, 'model' => OPENROUTERAI_MODEL, 'forecast' => ['main' => $forecastMain, 'description' => $forecastDescription]]);
+    $forecastMain = implode(', ', $result2['aggregate']['uniqueWeatherMains']);
+    $forecastDescription = implode(', ', $result2['aggregate']['uniqueWeatherDescriptions']);
+    
+    $result = fetchWeekendActivitiesSuggestions($result1['name'], $result2['aggregate']['uniqueWeatherDescriptions']);
+    echo json_encode(['activities' => $result['choices'][0]['message']['content'], 'model' => OPENROUTERAI_MODEL, 'forecast' => ['main' => $forecastMain, 'description' => $forecastDescription]]);
+
+    //$response = generateSuccessResponse($data, $cacheStatus, 'json');
+    //sendResponse($response);
 }
 #endregion handlerfunctions
 
@@ -280,9 +315,10 @@ function v2HandleWeekendActivities($cityId) {
 //-------------------------------------
 //          Data Fetching
 //-------------------------------------
+// fetch from cache or API
 #region fetching
-function v2FetchWeatherData($cityId, $endpoint) {
-    $key = "{$endpoint}_{$cityId}";
+function v2FetchWeatherData($cityId, $endpoint='weather') {
+    $key = "v2_{$endpoint}_{$cityId}";
     $filePath = getCacheFilePath($key);
 
     // Check if cache is valid
@@ -297,6 +333,7 @@ function v2FetchWeatherData($cityId, $endpoint) {
         header("X-Cache-Age: $cacheAge");
         // adding a flag to indicate this is from cache if necessary
         $data['_fromCache'] = true;
+        $data['_cacheAge'] = $cacheAge;
         return $data;
     } else {
         // Fetch new data
@@ -312,7 +349,8 @@ function v2FetchWeatherData($cityId, $endpoint) {
             header('X-Cache: MISS');
             // Optionally, add a flag or modify the response to indicate fresh data
             $response['_fromCache'] = false;
-        } else {
+            $response['_cacheAge'] = 0;
+        } else { //fixme
             // Handle error, including adding relevant headers if necessary
             header('Content-Type: application/json');
             // Assuming error handling is done within the callOpenWeatherMapAPI function,
@@ -526,6 +564,147 @@ function fetchWeekendActivitiesSuggestions($cityName, $arrForecasts) {
 //          Data Processing
 //-------------------------------------
 #region processing
+
+
+function transformExternalToInternalData(OpenWeatherMap\v2_5\WeatherResponse $weatherResponse): Location\LocationCharacteristics {
+    $locChar = new Location\LocationCharacteristics();
+    
+    // // Mapping data from OpenWeatherMap to LocationCharacteristics properties
+    //$locChar->epoch = $weatherResponse->dt;
+    $locChar->location->countrycode = $weatherResponse->sys->country;
+    $locChar->location->name = $weatherResponse->name;
+    $locChar->location->openweathercityid = $weatherResponse->id;
+    $locChar->location->lat = $weatherResponse->coordinates->lat;
+    $locChar->location->lon = $weatherResponse->coordinates->lon;
+    $locChar->location->timezoneOffset = $weatherResponse->timezone;
+
+    $dsi = date_sun_info($weatherResponse->dt, $weatherResponse->coordinates->lat, $weatherResponse->coordinates->lon); // todo implement true and false return values e.g. polar day
+    $locChar->astronomicalData->sunrise = $weatherResponse->sys->sunrise;
+    $locChar->astronomicalData->sunset = $weatherResponse->sys->sunset;
+    $locChar->astronomicalData->trueNoon = $dsi['transit'];
+    $locChar->astronomicalData->trueNoonDisplay = formatDateSunInfo($dsi['transit'], $locChar->location->timezoneOffset, 'transit');
+    $locChar->astronomicalData->civil_twilight_begin = formatDateSunInfo($dsi['civil_twilight_begin'], $locChar->location->timezoneOffset, 'civil_twilight_begin');
+    $locChar->astronomicalData->civil_twilight_end = formatDateSunInfo($dsi['civil_twilight_end'], $locChar->location->timezoneOffset, 'civil_twilight_end');
+    $locChar->astronomicalData->nautical_twilight_begin = formatDateSunInfo($dsi['nautical_twilight_begin'], $locChar->location->timezoneOffset, 'nautical_twilight_begin');
+    $locChar->astronomicalData->nautical_twilight_end = formatDateSunInfo($dsi['nautical_twilight_end'], $locChar->location->timezoneOffset, 'nautical_twilight_end');
+    $locChar->astronomicalData->astronomical_twilight_begin = formatDateSunInfo($dsi['astronomical_twilight_begin'], $locChar->location->timezoneOffset, 'astronomical_twilight_begin');
+    $locChar->astronomicalData->astronomical_twilight_end = formatDateSunInfo($dsi['astronomical_twilight_end'], $locChar->location->timezoneOffset, 'astronomical_twilight_end');
+    //$unixTimestamp, $timezoneOffset, $sunsetUnixtime
+    $locChar->astronomicalData->daylightAfter5pm = calculateDaylightAfter5PM($weatherResponse->dt, $weatherResponse->timezone, $weatherResponse->sys->sunset);
+
+    // Example: transforming weather data
+    if (!empty($weatherResponse->weather)) {
+        $firstWeatherCondition = $weatherResponse->weather[0];
+        //$locChar->epoch = $weatherResponse->dt;
+        $locChar->weather->epoch = $weatherResponse->dt;
+        $localTime = convertUnixtimeToLocaltime($weatherResponse->dt, $locChar->location->timezoneOffset);
+        $locChar->weather->localDateTime = $localTime->format('c');
+        $locChar->weather->localTime = $localTime->format('H:i');
+        $locChar->weather->isCached = $weatherResponse->_fromCache;
+        $locChar->weather->cacheAge = $weatherResponse->_cacheAge;
+        $locChar->weather->temperature = $weatherResponse->main->temp;
+        $locChar->weather->group = $firstWeatherCondition->main;
+        $locChar->weather->condition = $firstWeatherCondition->description;
+        $locChar->weather->humidity = $weatherResponse->main->humidity;
+        $locChar->weather->iconUrl = "https://openweathermap.org/img/wn/" . $firstWeatherCondition->icon . ".png";
+    }
+    $wkEndBounds = v2CalculateWeekendBoundaries($weatherResponse->dt, $weatherResponse->timezone);
+    $locChar->weekend->begin = $wkEndBounds['weekendBegin'];
+    $locChar->weekend->end = $wkEndBounds['weekendEnd'];
+
+    return $locChar;
+}
+
+function calculateDaylightAfter5PM($unixTimestamp, $timezoneOffset, $sunsetUnixtime) {
+    // Convert the given unix timestamp and sunset time to DateTime objects with UTC timezone
+    $currentDateTime = (new \DateTime())->setTimestamp($unixTimestamp)->setTimezone(new \DateTimeZone('UTC'));
+    $sunsetDateTime = (new \DateTime())->setTimestamp($sunsetUnixtime)->setTimezone(new \DateTimeZone('UTC'));
+
+    // Convert to local time by adding the timezone offset
+    $localDateTime = convertUnixtimeToLocaltime($unixTimestamp, $timezoneOffset);
+    $localSunsetDateTime = convertUnixtimeToLocaltime($sunsetUnixtime, $timezoneOffset);
+
+    // Create a DateTime object for 5PM on the same day as the local time
+    $fivePMDateTime = clone $localDateTime;
+    $fivePMDateTime->setTime(17, 0, 0); // 17:00 is 5 PM
+
+    // Calculate the difference in seconds between sunset and 5 PM
+    $diffSeconds = 0;
+    if ($localSunsetDateTime > $fivePMDateTime) {
+        $diff = $localSunsetDateTime->getTimestamp() - $fivePMDateTime->getTimestamp();
+        $diffSeconds = $diff > 0 ? $diff : "-";
+    } else {
+        $diffSeconds = "-";
+    }
+
+    return $diffSeconds;
+}
+
+function convertUnixtimeToLocaltime($unixTimestamp, $offsetInSeconds) {
+    // Create a DateTime object from the Unix timestamp
+    $dateTime = new \DateTime('@' . $unixTimestamp);
+    $dateTime->setTimezone(new \DateTimeZone('UTC')); // Set to UTC to ensure correct conversion
+
+    // Determine the sign and format the offset
+    $sign = $offsetInSeconds >= 0 ? '+' : '-';
+    $offsetFormatted = $sign . gmdate('H:i', abs($offsetInSeconds));
+
+    // Set the desired timezone with the formatted offset
+    $timezone = new \DateTimeZone($offsetFormatted);
+    $dateTime->setTimezone($timezone);
+
+    // Return the datetime in ISO 8601 format with timezone
+    return $dateTime;
+}
+
+function v2CalculateWeekendBoundaries($currentUnixTime, $timezoneOffset) {
+    //date_default_timezone_set('UTC');
+    $adjustedTime = $currentUnixTime + $timezoneOffset;
+    
+    $currentDateTime = new \DateTime("@$adjustedTime");
+    $currentDayOfWeek = $currentDateTime->format('l');
+    $currentHour = (int)$currentDateTime->format('G');
+    
+    $weekendStatus = [
+        'isWeekend' => false,
+        'upcomingWeekend' => false,
+        'weekendBegin' => null,
+        'weekendEnd' => null,
+    ];
+    
+    // Determine the start and end of the weekend based on constants
+    $weekendStart = (new \DateTime("Friday this week", new \DateTimeZone('UTC')))
+                        ->setTime(WEEKEND_START_HOUR, 0)
+                        ->getTimestamp() + $timezoneOffset;
+    
+    $weekendEnd = (new \DateTime("Sunday this week", new \DateTimeZone('UTC')))
+                      ->setTime(WEEKEND_END_HOUR, 0)
+                      ->getTimestamp() + $timezoneOffset;
+    
+    if ($currentDayOfWeek == 'Friday' && $currentHour >= WEEKEND_START_HOUR) {
+        $weekendStatus['isWeekend'] = true;
+    } elseif ($currentDayOfWeek == 'Saturday' || 
+             ($currentDayOfWeek == 'Sunday' && $currentHour < WEEKEND_END_HOUR)) {
+        $weekendStatus['isWeekend'] = true;
+    } else {
+        $weekendStatus['upcomingWeekend'] = true;
+    }
+    
+    if ($currentDayOfWeek == 'Sunday' && $currentHour >= WEEKEND_END_HOUR) {
+        // Adjust for the next weekend
+        $weekendStart += 7 * 24 * 60 * 60; // Add a week
+        $weekendEnd += 7 * 24 * 60 * 60;
+        $weekendStatus['upcomingWeekend'] = true;
+        $weekendStatus['isWeekend'] = false;
+    }
+    
+    $weekendStatus['weekendBegin'] = $weekendStart;
+    $weekendStatus['weekendEnd'] = $weekendEnd;
+
+    return $weekendStatus;
+}
+
+//depreceated!?!
 function determineWeekendStatus($currentUnixTime, $timezoneOffset) {
     // Define constant values for days and hours
 
@@ -574,6 +753,78 @@ function determineWeekendStatus($currentUnixTime, $timezoneOffset) {
         'weekendTimeframe' => $weekendTimeframe
     ];
 }
+
+//v1.9
+//todo check if int is necessary or was just a one-time dev-level code error while dev-testing
+function v2UpcomingWeekendWeather($cityId, $weekendBegin, $weekendEnd) {
+    $forecastRawData = v2FetchForecastData($cityId, 'forecast');
+    $forecastResponse = new \Backend\OpenWeatherMap\v2_5\ForecastResponse($forecastRawData);
+
+    $dayForecasts = [];
+    $nightForecasts = [];
+    $uniqueMains = [];
+    $uniqueDescriptions = [];
+    $totalTempDay = 0;
+    $totalTempNight = 0;
+    $countDay = 0;
+    $countNight = 0;
+    $debugDayForecasts = []; //todo remove
+    $debugNightForecasts = []; //todo remove
+
+    foreach ($forecastResponse->list as $forecastItem) {
+        $dt = $forecastItem->dt;
+        if ($dt >= (int)$weekendBegin && $dt <= (int)$weekendEnd) {
+            $hour = (int)date('G', $dt + $forecastResponse->city->timezone);
+
+            // Determine if this forecast is for day or night based on predefined constants
+            if ($hour >= DAYTIME_START_HOUR && $hour < DAYTIME_END_HOUR) {
+                // Day forecasts
+                $dayForecasts[] = $forecastItem;
+                $totalTempDay += $forecastItem->main->temp;
+                $debugDayForecasts[] = $forecastItem->main->temp; //todo remove
+                $countDay++;
+            } else {
+                // Night forecasts
+                $nightForecasts[] = $forecastItem;
+                $totalTempNight += $forecastItem->main->temp;
+                $debugNightForecasts[] = $forecastItem->main->temp; //todo remove
+                $countNight++;
+            }
+
+            // Collect unique "main" and "description" keys
+            foreach ($forecastItem->weather as $weather) {
+                $uniqueMains[$weather->main] = true;
+                $uniqueDescriptions[$weather->description] = true;
+            }
+        }
+    }
+
+    $averageTempDay = $countDay > 0 ? round($totalTempDay / $countDay, 2) : 0;
+    $averageTempNight = $countNight > 0 ? round($totalTempNight / $countNight, 2) : 0;
+
+    $lastForecastTimestamp = end($forecastResponse->list)->dt;
+    $coversEntireWeekend = $lastForecastTimestamp >= (int)$weekendEnd;
+    
+
+    return [
+        'dayForecasts' => $dayForecasts,
+        'nightForecasts' => $nightForecasts,
+        'averageTempDay' => $averageTempDay,
+        'averageTempNight' => $averageTempNight,
+        'uniqueMains' => array_keys($uniqueMains),
+        'uniqueDescriptions' => array_keys($uniqueDescriptions),
+        'debugDayForecasts' => $debugDayForecasts,
+        'debugDayCount' => $countDay,
+        'debugNightForecasts' => $debugNightForecasts,
+        'debugNightCount' => $countNight,
+        'weekendEnd' => (int)$weekendEnd,
+        'lastForecastTimestamp' => $lastForecastTimestamp,
+        'coversEntireWeekend' => $coversEntireWeekend,
+        'forecastResponse' => $forecastResponse,
+    ];
+}
+
+
 
 
 function upcomingWeekendWeather($cityId) {
@@ -754,6 +1005,82 @@ function handleClearCache() {
     ]);
     exit;
 }
+
+//v1.9
+function formatDateSunInfo($timestamp, $offset, $eventType) {
+    // Check if the event does not occur
+    if ($timestamp === false) {
+        return "-";
+    }
+    // Assuming a polar day/summer scenario where the sun is up all day
+    elseif ($timestamp === true) {
+        if (in_array($eventType, ['sunrise', 'civil_twilight_begin', 'nautical_twilight_begin', 'astronomical_twilight_begin'])) {
+            return '00:00';
+        } elseif (in_array($eventType, ['sunset', 'civil_twilight_end', 'nautical_twilight_end', 'astronomical_twilight_end'])) {
+            return '23:59';
+        }
+    }
+    // General case: format the UNIX timestamp
+    else {
+        $localDateTime = convertUnixtimeToLocaltime($timestamp, $offset);
+        return $localDateTime->format('H:i'); //todo round properly
+    }
+}
+
+//v1.9
+function generateSuccessResponse($data, $cacheStatus = null, $format = 'json') {
+    $response = [
+        'status' => 'success',
+        'code' => 200,
+        'message' => 'Data retrieved successfully.',
+        'data' => $data,
+        'meta' => [
+            'requestId' => uniqid('req_', true),
+            'timestamp' => date(DATE_ATOM),
+            'cacheStatus' => $cacheStatus,
+        ],
+    ];
+    return formatResponse($response, $format);
+}
+
+function generateErrorResponse($errorCode, $errorMessage, $errors = [], $format = 'json') {
+    $response = [
+        'status' => 'error',
+        'code' => $errorCode,
+        'message' => $errorMessage,
+        'errors' => $errors,
+        'meta' => [
+            'requestId' => uniqid('req_', true),
+            'timestamp' => date(DATE_ATOM),
+        ],
+    ];
+    return formatResponse($response, $format);
+}
+
+function formatResponse($response, $format = 'json') {
+    switch ($format) {
+        case 'html':
+            // This is a placeholder for HTML formatting
+            // Initially performs a null operation and can be expanded to parse data into an HTML template
+            return renderHtmlResponse($response);
+        case 'json':
+        default:
+            // Default to JSON format if not specified or if the format is unknown
+            header('Content-Type: application/json');
+            echo json_encode($response);
+            break;
+    }
+    exit; // Ensure script termination after response is sent
+}
+
+function renderHtmlResponse($response) {
+    // Placeholder for HTML rendering logic
+    // For now, we'll just indicate that HTML output is not implemented
+    echo "HTML output format is not implemented.";
+    exit;
+}
+
+
 #endregion helpers
 
 
@@ -860,7 +1187,7 @@ namespace Backend\OpenWeatherMap\v2_5 {
         public array $weather = [];
         public Wind $wind;
         public Clouds $clouds;
-        public int $visibility;
+        public ?int $visibility = null;
         public float $pop;
         public Sys $sys;
         public string $dt_txt;
@@ -873,8 +1200,10 @@ namespace Backend\OpenWeatherMap\v2_5 {
             }
             $this->wind = new Wind($data['wind']);
             $this->clouds = new Clouds($data['clouds']);
-            $this->visibility = $data['visibility'];
-            $this->pop = $data['pop'];
+            //$this->visibility = $data['visibility'];
+            $this->visibility = $data['visibility'] ?? null;
+            //$this->pop = $data['pop'];
+            //$this->pop = $data['pop'] ?? 0;
             $this->sys = new Sys($data['sys']);
             $this->dt_txt = $data['dt_txt'];
         }
@@ -885,7 +1214,7 @@ namespace Backend\OpenWeatherMap\v2_5 {
         public array $weather = [];
         public string $base;
         public Main $main;
-        public int $visibility;
+        public ?int $visibility = null;
         public Wind $wind;
         public Clouds $clouds;
         public int $dt;
@@ -895,6 +1224,7 @@ namespace Backend\OpenWeatherMap\v2_5 {
         public string $name;
         public int $cod;
         public bool $_fromCache;
+        public int $_cacheAge;
     
         public function __construct(array $data) {
             $this->coordinates = new Coordinates($data['coord']);
@@ -903,7 +1233,8 @@ namespace Backend\OpenWeatherMap\v2_5 {
             }
             $this->base = $data['base'];
             $this->main = new Main($data['main']);
-            $this->visibility = $data['visibility'];
+            //$this->visibility = $data['visibility'];
+            $this->visibility = $data['visibility'] ?? null;
             $this->wind = new Wind($data['wind']);
             $this->clouds = new Clouds($data['clouds']);
             $this->dt = $data['dt'];
@@ -913,6 +1244,7 @@ namespace Backend\OpenWeatherMap\v2_5 {
             $this->name = $data['name'];
             $this->cod = $data['cod'];
             $this->_fromCache = $data['_fromCache'];
+            $this->_cacheAge = $data['_cacheAge'];
         }
     }
     
@@ -964,15 +1296,17 @@ namespace Backend\OpenWeatherMap\v2_5 {
 #endregion nsowm25
 
 #region nslc
-namespace Backend\Locale {
+namespace Backend\Location {
 
 /**
  * Represents the comprehensive characteristics of a location, including weather,
  * astronomical data, and suggested activities.
+ * LocationCharacteristics class effectively bridges external API data with the needs of the frontend.
  */
 class LocationInfo {
     public string $name = '';
-    public int $id = 0;
+    public string $countrycode = '';
+    public int $openweathercityid;
     public int $timezoneOffset = 0;
     public float $lat = 0.0;
     public float $lon = 0.0;
@@ -982,15 +1316,36 @@ class AstronomicalData {
     public string $sunrise = '';
     public string $sunset = '';
     public string $trueNoon = '';
-    public string $daylightAfter5pm = '';
+    public string $daylightAfter5pm = ''; // todo check polar day
+    public string $civil_twilight_begin = '';
+    public string $civil_twilight_end = '';
+    public string $nautical_twilight_begin = '';
+    public string $nautical_twilight_end = '';
+    public string $astronomical_twilight_begin = '';
+    public string $astronomical_twilight_end = '';
 }
 
 class WeatherCondition {
-    public int $temperature = 0;
-    public string $group = '';
-    public string $condition = '';
+    public float $temperature = 0.0;
+    public string $group = ''; //todo check rename plural
+    public string $condition = ''; //todo check rename plural
     public int $humidity = 0;
     public string $iconUrl = '';
+    public bool $isCached = false;
+    public int $cacheAge = 0;
+    public ?int $epoch = null;
+    public ?string $localDateTime = null;
+    public ?string $localTime = null;
+}
+
+class WeatherConditionFIXME {
+    public float $temperature = 0.0;
+    public string $group = ''; //todo check rename plural
+    public string $condition = ''; //todo check rename plural
+    public int $humidity = 0;
+    public string $iconUrl = '';
+    public bool $isCached = false;
+    public int $cacheAge = 0;
 }
 
 class ForecastCondition {
@@ -1006,39 +1361,51 @@ class SuggestedActivity {
     public string $activity = '';
 }
 
+//todo fix wording
 class AggregatedWeekendForecast {
     public string $begin = '';
     public string $end = '';
-    public WeatherCondition $day;
-    public WeatherCondition $night;
+    public WeatherConditionFIXME $day; // todo make specific (aggregate has no single timestamp)
+    public WeatherConditionFIXME $night;
+    public array $suggestedActivities = [];
 
     public function __construct() {
-        $this->day = new WeatherCondition();
-        $this->night = new WeatherCondition();
+        $this->day = new WeatherConditionFIXME();
+        $this->night = new WeatherConditionFIXME();
+        $this->addSuggestedActivity('test');
+    }
+    
+    public function addSuggestedActivity(string $activity): void {
+        //$this->suggestedActivities[] = new SuggestedActivity($activity);
+        //todo fix / remove / remove class / toString
+        $this->suggestedActivities[] = 'foo';
+        $this->suggestedActivities[] = 'bar';
+        $this->suggestedActivities[] = 'baz';
     }
 }
 
-class LocaleCharacteristics {
+class LocationCharacteristics {
     public bool $isCached = false;
-    public int $cacheAge = 0;
+    public int $cacheAge = -1;
     public ?int $epoch = null;
+    public ?string $localDateTime = null;
     public ?string $localTime = null;
     public LocationInfo $location;
-    public AstronomicalData $astronomicalData;
-    public WeatherCondition $currentWeather;
-    public array $weatherForecast = [];
-    public array $suggestedActivities = [];
-    public AggregatedWeekendForecast $forecastWeekend;
+    public AstronomicalData $astronomicalData; //todo check rename to astro
+    public WeatherCondition $weather;
+    public array $forecast = [];
+    //public array $suggestedActivities = [];
+    public AggregatedWeekendForecast $weekend; //todo fix naming, remove point-in-time properties
 
     public function __construct() {
         $this->location = new LocationInfo();
         $this->astronomicalData = new AstronomicalData();
-        $this->currentWeather = new WeatherCondition();
-        $this->forecastWeekend = new AggregatedWeekendForecast();
+        $this->weather = new WeatherCondition();
+        $this->weekend = new AggregatedWeekendForecast();
     }
 
     public function addWeatherForecast(ForecastCondition $forecastCondition): void {
-        $this->weatherForecast[] = $forecastCondition;
+        $this->forecast[] = $forecastCondition;
     }
     
     public function addSuggestedActivity(string $activity): void {
@@ -1048,6 +1415,6 @@ class LocaleCharacteristics {
 }
 
 
-} # end namespace Backend\Locale
+} # end namespace Backend\Location
 
-#endregio nslc
+#endregion nslc
