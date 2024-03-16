@@ -51,9 +51,13 @@ define('CACHE_DIRECTORY', __DIR__ . '/cache/');
 define('OPENWEATHERMAP_API_KEY', $dotenv["OPENWEATHERMAP_APIKEY"]);
 define('OPENWEATHERMAP_BASE_URL', 'http://api.openweathermap.org/data/2.5/');
 
+define('OPENROUTERAI_API_KEY', $dotenv["OPENROUTERAI_APIKEY"]);
+define('OPENROUTERAI_BASE_URL', 'https://openrouter.ai/api/v1');
+define('OPENROUTERAI_MODEL', 'anthropic/claude-3-haiku:beta');
+
 define('DAYS_BEFORE_WEEKEND', 4);
 define('WEEKEND_DAY_START_HOUR', 8);
-define('WEEKEND_DAY_END_HOUR', 20);
+define('WEEKEND_DAY_END_HOUR', 19);
 define('WEEKEND_START_HOUR', 18);
 define('WEEKEND_END_HOUR', 21);
 
@@ -118,11 +122,15 @@ if ($version === 'v1') {
             handleClearCache();
             break;
 
+        case 'weekend-activities':
+            v2HandleWeekendActivities($cityId);
+            break;
+
         case 'preview':
             $result = v2FetchWeatherData($cityId, 'weather');
             //echo json_encode(['debug' => $result]);
             $result2 = generateWeekendForecast($cityId, $result['timezone']);
-            echo json_encode(['forecast' => $result2]);
+            echo json_encode(['debug' => $result2['aggregate'], 'forecast' => $result2]);
             break;
 
         default:
@@ -240,6 +248,22 @@ function handleHealthCheck() {
     // Mock response for demonstration
     header('Content-Type: application/json');
     echo json_encode(["status" => "OK", "uptime" => "4711"]);
+}
+
+/**
+ * 
+ * Used By:
+ * - API v1.9
+ */
+function v2HandleWeekendActivities($cityId) {
+    
+    $result1 = v2FetchWeatherData($cityId, 'weather');
+    $result2 = generateWeekendForecast($cityId, $result1['timezone']);
+    $forecastMain = implode(', ', $result2['aggregate']['uniqueWeatherMains']);
+    $forecastDescription = implode(', ', $result2['aggregate']['uniqueWeatherDescriptions']);
+    
+    $result = fetchWeekendActivitiesSuggestions($result1['name'], $result2['aggregate']['uniqueWeatherDescriptions']);
+    echo json_encode(['activities' => $result['choices'][0]['message']['content'], 'model' => OPENROUTERAI_MODEL, 'forecast' => ['main' => $forecastMain, 'description' => $forecastDescription]]);
 }
 #endregion handlerfunctions
 
@@ -432,6 +456,60 @@ function callOpenWeatherMapAPI($endpoint, array $params = []) {
         ];
     }
 }
+
+function fetchWeekendActivitiesSuggestions($cityName, $arrForecasts) {
+    $cacheKey = "activities_" . md5($cityName . implode('_', $arrForecasts));
+    $cacheFilePath = getCacheFilePath($cacheKey);
+
+    if (isCacheValid($cacheFilePath)) {
+        return json_decode(file_get_contents($cacheFilePath), true);
+    }
+
+    // Prepare the prompt with dynamic content
+    $aggregatedForecasts = implode(' and ', $arrForecasts);
+    $promptContent = "Given the weather forecast for $cityName, this weekend is forecasted $aggregatedForecasts, I'm looking for suggestions on what to do as a local, given the current weather conditions. list 3 locations to visit tailored for a local resident. Return a comma-separated list consisting of the location names only and nothing else. do not paraphrase the request";
+
+    $postData = [
+        "model" => OPENROUTERAI_MODEL,
+        "messages" => [
+            ["role" => "system", "content" => "You are a helpful assistant."],
+            ["role" => "user", "content" => $promptContent]
+        ],
+        "response_format" => ["type" => "json_object"],
+        "temperature" => 0.1,
+        "top_p" => 0,
+        "top_a" => 1,
+        "max_tokens" => 64
+    ];
+
+    $curl = curl_init(OPENROUTERAI_BASE_URL . '/chat/completions');
+    curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($curl, CURLOPT_POST, true);
+    curl_setopt($curl, CURLOPT_POSTFIELDS, json_encode($postData));
+    curl_setopt($curl, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . OPENROUTERAI_API_KEY
+    ]);
+
+    $response = curl_exec($curl);
+    $httpCode = curl_getinfo($curl, CURLINFO_HTTP_CODE);
+    curl_close($curl);
+
+    if ($httpCode == 200) {
+        $data = json_decode($response, true);
+        file_put_contents($cacheFilePath, json_encode($data));
+        return $data;
+    } else {
+        // Handle the error accordingly. Here's a basic error structure.
+        return [
+            'error' => true,
+            'message' => 'Failed to fetch activity suggestions.',
+            'httpCode' => $httpCode
+        ];
+    }
+}
+
+
 #endregion
 
 
@@ -440,6 +518,7 @@ function callOpenWeatherMapAPI($endpoint, array $params = []) {
 //-------------------------------------
 #region processing
 function determineWeekendStatus($currentUnixTime, $timezoneOffset) {
+    // Define constant values for days and hours
 
     // Calculate the current day and time in the local timezone
     $localUnixTime = $currentUnixTime + $timezoneOffset;
@@ -450,27 +529,34 @@ function determineWeekendStatus($currentUnixTime, $timezoneOffset) {
     $isWeekend = false;
     $weekendTimeframe = ['begin' => null, 'end' => null];
 
+    // Determine if it's before the countdown to the weekend starts
     if ($dayOfWeek >= 1 && $dayOfWeek <= 5 - DAYS_BEFORE_WEEKEND) {
-        // It's before the countdown to the weekend starts
         $upcomingWeekend = false;
         $isWeekend = false;
-    } elseif ($dayOfWeek < 5 || ($dayOfWeek == 5 && $hour < 18)) {
+    } elseif ($dayOfWeek < 5 || ($dayOfWeek == 5 && $hour < WEEKEND_START_HOUR)) {
         // It's within the countdown period to the weekend but before the weekend starts
         $upcomingWeekend = true;
         $isWeekend = false;
-    } elseif (($dayOfWeek == 5 && $hour >= WEEKEND_START_HOUR) || $dayOfWeek == 6 || ($dayOfWeek == 7 && $hour <= WEEKEND_END_HOUR)) {
+    } elseif (($dayOfWeek == 5 && $hour >= WEEKEND_START_HOUR) || $dayOfWeek > 5 || ($dayOfWeek == 7 && $hour <= WEEKEND_END_HOUR)) {
         // It's the weekend
         $upcomingWeekend = false;
         $isWeekend = true;
     }
 
     if ($upcomingWeekend || $isWeekend) {
-        // Calculate beginning of the weekend: Friday at 18:00 local time
-        $weekendBeginTime  = strtotime("this Friday " . WEEKEND_START_HOUR . ":00", $currentUnixTime) + $timezoneOffset - date('Z', $currentUnixTime);
-        // Calculate end of the weekend: Sunday at 21:00 local time
-        $weekendEndTime  = strtotime("this Sunday " . WEEKEND_END_HOUR . ":00", $currentUnixTime) + $timezoneOffset - date('Z', $currentUnixTime);
+        // Adjust the logic for calculating the beginning of the weekend
+        if ($dayOfWeek >= 5 && $dayOfWeek <= 7) {
+            // If it's already Friday or the weekend, use "last Friday" to ensure we're pointing to the correct date
+            $weekendBeginTime = strtotime("last Friday " . WEEKEND_START_HOUR . ":00", $currentUnixTime) + $timezoneOffset - date('Z');
+        } else {
+            // Otherwise, use "this Friday" to point to the upcoming Friday
+            $weekendBeginTime = strtotime("this Friday " . WEEKEND_START_HOUR . ":00", $currentUnixTime) + $timezoneOffset - date('Z');
+        }
 
-        $weekendTimeframe = ['begin' => $weekendBeginTime , 'end' => $weekendEndTime ];
+        // Calculate end of the weekend: Sunday at 21:00 local time
+        $weekendEndTime = strtotime("this Sunday " . WEEKEND_END_HOUR . ":00", $currentUnixTime) + $timezoneOffset - date('Z');
+
+        $weekendTimeframe = ['begin' => $weekendBeginTime, 'end' => $weekendEndTime];
     }
 
     return [
@@ -479,6 +565,7 @@ function determineWeekendStatus($currentUnixTime, $timezoneOffset) {
         'weekendTimeframe' => $weekendTimeframe
     ];
 }
+
 
 function upcomingWeekendWeather($cityId) {
     $forecastData = v2FetchForecastData($cityId, 'forecast');
@@ -520,8 +607,11 @@ function upcomingWeekendWeather($cityId) {
 function aggregateWeekendWeather($forecastData) {
     $temperatureMin = PHP_INT_MAX;
     $temperatureMax = PHP_INT_MIN;
+    $weatherMains = [];
     $weatherConditions = [];
     $uniqueWeatherForecasts = [];
+    $uniqueForecastWeatherMain = [];
+    $uniqueForecastWeatherDescription = [];
 
     foreach ($forecastData['openweatherdata'] as $forecast) {
         // Aggregate temperature data
@@ -530,22 +620,32 @@ function aggregateWeekendWeather($forecastData) {
         
         // Collect unique weather conditions
         foreach ($forecast['weather'] as $weather) {
-            $condition = $weather['main'];
-            if (!in_array($condition, $weatherConditions)) {
-                $weatherConditions[] = $condition;
+            $weatherMain = $weather['main'];
+            $weatherDescription = $weather['description'];
+
+            if (!in_array($weatherMain, $weatherMains)) {
+                $weatherMains[] = $weatherMain;
+            }
+            if (!in_array($weatherDescription, $weatherConditions)) {
+                $weatherConditions[] = $weatherDescription;
             }
         }
     }
 
     // Prepare unique weather forecasts summary
-    $uniqueWeatherForecasts = array_unique($weatherConditions);
-    sort($uniqueWeatherForecasts); // Optional, for a sorted list of conditions
+    $uniqueForecastWeatherDescription = array_unique($weatherConditions);
+    sort($uniqueForecastWeatherDescription); // Optional, for a sorted list of conditions
+    $uniqueForecastWeatherMain = array_unique($weatherMains);
+    sort($uniqueForecastWeatherMain); // Optional, for a sorted list of conditions
 
     // Prepare the aggregate data
     $aggregateData = [
         'temperatureRange' => sprintf("%.1f°C to %.1f°C", $temperatureMin, $temperatureMax),
-        'overallWeatherOutlook' => implode(", ", $uniqueWeatherForecasts),
-        'uniqueWeatherForecasts' => $uniqueWeatherForecasts
+        'overallWeatherMain' => implode(", ", $uniqueForecastWeatherDescription),
+        'overallWeatherDescription' => implode(", ", $uniqueForecastWeatherMain),
+        'uniqueWeatherDescriptions' => $uniqueForecastWeatherDescription,
+        'uniqueWeatherMains' => $uniqueForecastWeatherMain,
+        'uniqueWeatherForecasts' => $uniqueForecastWeatherMain
     ];
 
     return $aggregateData;

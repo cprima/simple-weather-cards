@@ -93,12 +93,13 @@ v2LoadWeatherCards();
     }
 
 function v2LoadWeatherCards() {
-  const params = new URLSearchParams(window.location.search);
-  const cities = params.get('cities') ? params.get('cities').split(',') : [];
+  const params = getUrlParams();
+  const cities = params.cities ? params.cities.split(',') : [];
 
   cities.forEach(cityId => {
     const currentWeatherUrl = `https://cpr.in-berlin.de/weather/api/v1.9/current?cityId=${cityId}`;
     const forecastUrl = `https://cpr.in-berlin.de/weather/api/v1.9/forecast?cityId=${cityId}`;
+    const activitiesUrl = `https://cpr.in-berlin.de/weather/api/v1.9/weekend-activities?cityId=${cityId}`;
 
     // Fetch current weather data
     fetch(currentWeatherUrl)
@@ -111,6 +112,13 @@ function v2LoadWeatherCards() {
       .then(response => response.json())
       .then(data => console.log(`Forecast data for cityId ${cityId}:`, data))
       .catch(error => console.error(`Error fetching forecast for cityId ${cityId}:`, error));
+
+    // Fetch weekend activities data
+    fetch(activitiesUrl)
+      .then(response => response.json())
+      .then(data => { console.log(`Weekend activities data for cityId ${cityId}:`, data)})
+      .catch(error => console.error(`Error fetching weekend activities for cityId ${cityId}:`, error));
+
   });
 }
 
@@ -121,7 +129,7 @@ function v2LoadWeatherCards() {
       const queryString = window.location.search;
       const urlParams = new URLSearchParams(queryString);
       return {
-        cities: urlParams.get('cities') || '2857458,2806654,2866375,616530,617026,611717',
+        cities: urlParams.get('cities') || '2857458,2806654,2832495,616530,617026,611717',
         primaryColor: `#${urlParams.get('primaryColor') || 'cb4b16'}`,
         secondaryColor: `#${urlParams.get('secondaryColor') || 'eee8d5'}`,
         padTop: `${urlParams.get('padTop') || '20px'}`,
@@ -154,6 +162,7 @@ function v2LoadWeatherCards() {
       const cityId = openweatherdata.id.toString();
       const defaultCityName = openweatherdata.name;
       const displayName = getCityDisplayName(cityId, defaultCityName);
+
 
       // Create the card container
       const card = document.createElement('div');
@@ -216,6 +225,52 @@ function v2LoadWeatherCards() {
       main.appendChild(humidityItem);
       main.appendChild(daylightItem);
       main.appendChild(solarnoonItem);
+
+
+
+
+    const activitiesUrl = `https://cpr.in-berlin.de/weather/api/v1.9/weekend-activities?cityId=${cityId}`;
+    // Fetch forecast data
+    fetch(activitiesUrl)
+      .then(response => response.json())
+      .then(data => {
+        console.log(`Weekend activities data for cityId ${cityId}:`, data)
+        //const activitiesContent = data['data']['choices'][0]['message']['content'];
+        const activitiesContent = data['activities'];
+        const activitiesArray = activitiesContent.split(',').map(activity => activity.trim());
+
+        // Create a div to wrap the ul
+        const weekendActivitiesDiv = document.createElement('div');
+        weekendActivitiesDiv.className = 'weekend-activities-container';
+
+        // Create and append the header
+        const activitiesHeader = document.createElement('p');
+        activitiesHeader.className = 'weekend-activities-header';
+        activitiesHeader.textContent = "Suggested weekend activities:";
+        activitiesHeader.setAttribute('title', 'for ' + data['forecast']['description'] + ' by ' + data['model'])
+        weekendActivitiesDiv.appendChild(activitiesHeader);
+
+        const weekendActivitiesList = document.createElement('ul');
+        weekendActivitiesList.className = 'weekend-activities-list';
+
+        activitiesArray.forEach(activity => {
+          const activityListItem = document.createElement('li');
+          activityListItem.className = 'activity-list-item';
+          activityListItem.textContent = activity;
+          weekendActivitiesList.appendChild(activityListItem);
+        });
+
+        // Append the ul to the wrapping div
+        weekendActivitiesDiv.appendChild(weekendActivitiesList);
+
+        main.appendChild(weekendActivitiesDiv);
+
+      })
+      .catch(error => console.error(`Error fetching weekend activities for cityId ${cityId}:`, error));
+
+
+
+
 
       // Append elements to main content area and card
       card.appendChild(header);
